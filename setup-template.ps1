@@ -12,7 +12,7 @@ param(
     [string]$AppDescription = "A React Native app with Expo, Tamagui, and AWS Cognito authentication",
     
     [Parameter(Mandatory=$false)]
-    [string]$AppEmoji = "📱",
+    [string]$AppEmoji = "🐶",
     
     [Parameter(Mandatory=$false)]
     [string]$IOSBundleId = "com.yourcompany.yourapp",
@@ -27,11 +27,11 @@ param(
     [string]$DeveloperName = "Your Name"
 )
 
-Write-Host "🚀 Setting up React Native Template for: $AppName" -ForegroundColor Green
+Write-Host "Setting up React Native Template for: $AppName" -ForegroundColor Green
 Write-Host ""
 
 # Update template.config.ts
-Write-Host "📝 Updating template configuration..." -ForegroundColor Yellow
+Write-Host "Updating template configuration..." -ForegroundColor Yellow
 
 $templateConfig = @"
 // Template configuration file
@@ -53,7 +53,6 @@ export const TEMPLATE_CONFIG = {
   
   // Company/Developer Info
   COMPANY_NAME: "$CompanyName",
-  DEVELOPER_NAME: "$DeveloperName",
   
   // EAS Project (you'll need to run eas build:configure)
   EAS_PROJECT_ID: "your-eas-project-id",
@@ -78,7 +77,6 @@ export const {
   IOS_BUNDLE_ID,
   ANDROID_PACKAGE,
   COMPANY_NAME,
-  DEVELOPER_NAME,
   EAS_PROJECT_ID,
   AWS_REGION,
   AWS_USER_POOL_ID,
@@ -88,38 +86,38 @@ export const {
 "@
 
 $templateConfig | Out-File -FilePath "template.config.ts" -Encoding UTF8
-Write-Host "✅ Updated template.config.ts" -ForegroundColor Green
+Write-Host "Updated template.config.ts" -ForegroundColor Green
 
 # Update app.json
-Write-Host "📝 Updating app.json..." -ForegroundColor Yellow
+Write-Host "Updating app.json..." -ForegroundColor Yellow
 
 $appJson = Get-Content "app.json" | ConvertFrom-Json
 $appJson.expo.name = $AppName
 $appJson.expo.slug = $AppSlug
 $appJson.expo.ios.bundleIdentifier = $IOSBundleId
-# Note: Android package is typically set in app.json as well, but it's usually in android.package
+# Note: Android package is typically set in app.json as well, but it is usually in android.package
 # For now, we'll keep the structure as is since Expo manages this
 
 $appJson | ConvertTo-Json -Depth 10 | Out-File -FilePath "app.json" -Encoding UTF8
-Write-Host "✅ Updated app.json" -ForegroundColor Green
+Write-Host "Updated app.json" -ForegroundColor Green
 
 # Update package.json
-Write-Host "📝 Updating package.json..." -ForegroundColor Yellow
+Write-Host "Updating package.json..." -ForegroundColor Yellow
 
 $packageJson = Get-Content "package.json" | ConvertFrom-Json
 $packageJson.name = $AppSlug
 $packageJson.description = $AppDescription
 
 $packageJson | ConvertTo-Json -Depth 10 | Out-File -FilePath "package.json" -Encoding UTF8
-Write-Host "✅ Updated package.json" -ForegroundColor Green
+Write-Host "Updated package.json" -ForegroundColor Green
 
 Write-Host ""
-Write-Host "🎉 Template setup complete!" -ForegroundColor Green
+Write-Host "Template setup complete!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
-Write-Host "1. 📱 Replace app icons in the assets/ folder"
-Write-Host "2. 🔐 Set up AWS Cognito (see docs/AUTHENTICATION_GUIDE.md)"
-Write-Host "3. 🏗️  Run 'eas build:configure' to set up EAS builds"
-Write-Host "4. 🚀 Start developing: 'npm start'"
+Write-Host "1. Replace app icons in the assets/ folder"
+Write-Host "2. Set up AWS Cognito (see docs/AUTHENTICATION_GUIDE.md)"
+Write-Host "3. Run 'eas build:configure' to set up EAS builds"
+Write-Host "4. Start developing: 'npm start'"
 Write-Host ""
-Write-Host "Happy coding! 🚀" -ForegroundColor Green 
+Write-Host "Happy coding!" -ForegroundColor Green 

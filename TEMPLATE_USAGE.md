@@ -45,7 +45,6 @@ export const TEMPLATE_CONFIG = {
 
   // Company/Developer Info
   COMPANY_NAME: "Your Company Name",
-  DEVELOPER_NAME: "Your Name",
 
   // These will be configured later
   EAS_PROJECT_ID: "your-eas-project-id",
