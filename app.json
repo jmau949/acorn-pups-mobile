@@ -1,4 +1,4 @@
-﻿{
+{
   "expo": {
     "name": "Acorn Pups",
     "slug": "acorn-pups-mobile",
@@ -30,7 +30,9 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "eas": {}
+      "eas": {
+        "projectId": "bef28c9d-7112-48a9-8d34-7e679aff365f"
+      }
     }
   }
 }
