@@ -21,10 +21,6 @@ export const TEMPLATE_CONFIG = {
   // EAS Project (you'll need to run eas build:configure)
   EAS_PROJECT_ID: "your-eas-project-id",
   
-  // AWS Cognito (you'll need to set these up)
-  AWS_REGION: "us-east-1",
-  AWS_USER_POOL_ID: "us-east-1_xxxxxxxxx",
-  AWS_USER_POOL_CLIENT_ID: "xxxxxxxxxxxxxxxxxxxxxxxxxx",
   
   // Git Repository
   REPO_URL: "https://github.com/jmau949/acorn-pups-mobile",

@@ -48,9 +48,7 @@ export const TEMPLATE_CONFIG = {
 
   // These will be configured later
   EAS_PROJECT_ID: "your-eas-project-id",
-  AWS_REGION: "us-east-1",
-  AWS_USER_POOL_ID: "us-east-1_xxxxxxxxx",
-  AWS_USER_POOL_CLIENT_ID: "xxxxxxxxxxxxxxxxxxxxxxxxxx",
+
   REPO_URL: "https://github.com/yourusername/your-repo",
 };
 ```
