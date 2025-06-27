@@ -72,21 +72,6 @@ The template will automatically use your `template.config.ts` values, but you ma
 
 Follow our [Authentication Guide](./docs/AUTHENTICATION_GUIDE.md) to set up AWS Cognito and configure your authentication.
 
-### 6. Start Development
-
-```powershell
-# Install EAS CLI if you haven't already
-npm install -g @expo/cli eas-cli
-
-# Login to Expo
-eas login
-
-# Configure EAS builds
-eas build:configure
-
-# Start development server
-npm start
-```
 
 ## 📁 Project Structure
 
