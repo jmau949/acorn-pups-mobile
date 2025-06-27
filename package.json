@@ -1,71 +1,71 @@
-﻿{
-    "name": "acorn-pups-mobile",
-    "version": "1.0.0",
-    "description": "A React Native app with Expo, Tamagui, and AWS Cognito authentication",
-    "main": "index.ts",
-    "scripts": {
-      "start": "expo start --dev-client",
-      "start:clear": "expo start --clear",
-      "android": "expo start --android",
-      "ios": "expo start --ios",
-      "web": "expo start --web",
-      "build:android": "expo build:android",
-      "build:ios": "expo build:ios",
-      "build:web": "expo build:web",
-      "eject": "expo eject",
-      "lint": "eslint . --ext .ts,.tsx",
-      "type-check": "tsc --noEmit",
-      "test": "jest",
-      "prebuild": "expo prebuild",
-      "clean": "expo install --fix"
-    },
-    "dependencies": {
-      "@aws-amplify/react-native": "^1.1.10",
-      "@react-native-async-storage/async-storage": "^2.2.0",
-      "@react-navigation/native": "^7.1.12",
-      "@react-navigation/native-stack": "^7.3.17",
-      "@tamagui/babel-plugin": "^1.127.0",
-      "@tamagui/config": "^1.127.0",
-      "@tamagui/focusable": "^1.127.0",
-      "@tamagui/font-inter": "^1.127.0",
-      "@tamagui/get-button-sized": "^1.127.0",
-      "@tamagui/react-native-media-driver": "^1.127.0",
-      "aws-amplify": "^6.15.1",
-      "burnt": "^0.13.0",
-      "expo": "~53.0.10",
-      "expo-constants": "^17.1.6",
-      "expo-dev-client": "~5.2.1",
-      "expo-secure-store": "^14.2.3",
-      "expo-status-bar": "~2.2.3",
-      "react": "19.0.0",
-      "react-native": "0.79.3",
-      "react-native-get-random-values": "^1.11.0",
-      "react-native-safe-area-context": "^5.4.1",
-      "react-native-screens": "^4.11.1",
-      "tamagui": "^1.127.0"
-    },
-    "devDependencies": {
-      "@babel/core": "^7.25.2",
-      "@types/react": "~19.0.10",
-      "babel-plugin-module-resolver": "^5.0.2",
-      "typescript": "~5.8.3"
-    },
-    "keywords": [
-      "react-native",
-      "expo",
-      "tamagui",
-      "aws-cognito",
-      "template",
-      "authentication",
-      "typescript",
-      "mobile"
-    ],
-    "repository": {
-      "type": "git",
-      "url": "https://github.com/jmau949/acorn-pups-mobile"
-    },
-    "bugs": {
-      "url": "https://github.com/jmau949/acorn-pups-mobile/issues"
-    },
-    "homepage": "https://github.com/jmau949/acorn-pups-mobile#readme"
+{
+  "name": "acorn-pups-mobile",
+  "version": "1.0.0",
+  "description": "A React Native app with Expo, Tamagui, and AWS Cognito authentication",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "start:clear": "expo start --clear",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "build:android": "expo build:android",
+    "build:ios": "expo build:ios",
+    "build:web": "expo build:web",
+    "eject": "expo eject",
+    "lint": "eslint . --ext .ts,.tsx",
+    "type-check": "tsc --noEmit",
+    "test": "jest",
+    "prebuild": "expo prebuild",
+    "clean": "expo install --fix"
+  },
+  "dependencies": {
+    "@aws-amplify/react-native": "^1.1.10",
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-navigation/native": "^7.1.12",
+    "@react-navigation/native-stack": "^7.3.17",
+    "@tamagui/babel-plugin": "^1.127.0",
+    "@tamagui/config": "^1.127.0",
+    "@tamagui/focusable": "^1.127.0",
+    "@tamagui/font-inter": "^1.127.0",
+    "@tamagui/get-button-sized": "^1.127.0",
+    "@tamagui/react-native-media-driver": "^1.127.0",
+    "aws-amplify": "^6.15.1",
+    "burnt": "^0.13.0",
+    "expo": "~53.0.10",
+    "expo-constants": "^17.1.6",
+    "expo-dev-client": "~5.2.1",
+    "expo-secure-store": "^14.2.3",
+    "expo-status-bar": "~2.2.3",
+    "react": "19.0.0",
+    "react-native": "0.79.3",
+    "react-native-get-random-values": "^1.11.0",
+    "react-native-safe-area-context": "^5.4.1",
+    "react-native-screens": "^4.11.1",
+    "tamagui": "^1.127.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@types/react": "~19.0.10",
+    "babel-plugin-module-resolver": "^5.0.2",
+    "typescript": "~5.8.3"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "tamagui",
+    "aws-cognito",
+    "template",
+    "authentication",
+    "typescript",
+    "mobile"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jmau949/acorn-pups-mobile"
+  },
+  "bugs": {
+    "url": "https://github.com/jmau949/acorn-pups-mobile/issues"
+  },
+  "homepage": "https://github.com/jmau949/acorn-pups-mobile#readme"
 }
