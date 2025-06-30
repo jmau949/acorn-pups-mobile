@@ -35,8 +35,22 @@ export const CameraScreen: React.FC = () => {
   };
 
   const handleManualAdd = () => {
-    // For now, just go back - this could navigate to a manual entry form
+    console.log("Manual add button pressed");
+
+    // Get the parent navigation to handle the transition properly
+    const parentNavigation = navigation.getParent();
+
+    // First dismiss the camera modal
     navigation.goBack();
+
+    // Then navigate to Bluetooth search using parent navigation
+    setTimeout(() => {
+      if (parentNavigation) {
+        parentNavigation.navigate("BluetoothSearch");
+      } else {
+        navigation.navigate("BluetoothSearch");
+      }
+    }, 100);
   };
 
   if (!permission) {
@@ -82,100 +96,109 @@ export const CameraScreen: React.FC = () => {
   }
 
   return (
-    <ZStack flex={1}>
+    <YStack flex={1} backgroundColor="black">
       {/* Camera View - Full Screen */}
-      <CameraView
-        style={styles.camera}
-        facing={facing}
-        barcodeScannerSettings={{
-          barcodeTypes: ["qr", "pdf417"],
-        }}
-      />
+      <ZStack flex={1}>
+        <CameraView
+          style={styles.camera}
+          facing={facing}
+          barcodeScannerSettings={{
+            barcodeTypes: ["qr", "pdf417"],
+          }}
+        />
 
-      {/* Back Button - Positioned absolutely */}
-      <YStack position="absolute" top={insets.top + 16} left={16} zIndex={10}>
-        <Button
-          size="$4"
-          circular
-          backgroundColor="rgba(0, 0, 0, 0.5)"
-          onPress={handleClose}
-          pressStyle={{ backgroundColor: "rgba(0, 0, 0, 0.7)" }}
+        {/* Overlay Container */}
+        <YStack flex={1} pointerEvents="box-none">
+          {/* Top overlay */}
+          <YStack
+            style={[
+              styles.overlay,
+              {
+                height: (screenHeight - SCAN_AREA_SIZE) / 2,
+              },
+            ]}
+          />
+
+          {/* Middle section with scan area */}
+          <XStack flex={0} height={SCAN_AREA_SIZE}>
+            {/* Left overlay */}
+            <YStack
+              style={styles.overlay}
+              width={(screenWidth - SCAN_AREA_SIZE) / 2}
+            />
+
+            {/* Scan area - transparent without border */}
+            <YStack
+              width={SCAN_AREA_SIZE}
+              height={SCAN_AREA_SIZE}
+              style={styles.scanArea}
+            />
+
+            {/* Right overlay */}
+            <YStack
+              style={styles.overlay}
+              width={(screenWidth - SCAN_AREA_SIZE) / 2}
+            />
+          </XStack>
+
+          {/* Bottom overlay */}
+          <YStack
+            style={[
+              styles.overlay,
+              {
+                height: (screenHeight - SCAN_AREA_SIZE) / 2,
+              },
+            ]}
+            flex={1}
+          />
+        </YStack>
+
+        {/* Back Button - Positioned absolutely */}
+        <YStack
+          position="absolute"
+          top={insets.top + 16}
+          left={16}
+          zIndex={20}
+          pointerEvents="box-none"
         >
-          <Ionicons name="chevron-back" size={24} color="white" />
-        </Button>
-      </YStack>
+          <Button
+            size="$4"
+            circular
+            backgroundColor="rgba(0, 0, 0, 0.5)"
+            onPress={handleClose}
+            pressStyle={{ backgroundColor: "rgba(0, 0, 0, 0.7)" }}
+          >
+            <Ionicons name="chevron-back" size={24} color="white" />
+          </Button>
+        </YStack>
 
-      {/* Instructions - Positioned absolutely */}
-      <YStack
-        position="absolute"
-        top={insets.top + 80}
-        left={0}
-        right={0}
-        alignItems="center"
-        zIndex={10}
-      >
-        <Text color="white" fontSize="$5" fontWeight="600" textAlign="center">
-          Scan Device QR Code
-        </Text>
-        <Text color="$gray10" fontSize="$3" textAlign="center" marginTop="$2">
-          Position the QR code within the frame
-        </Text>
-      </YStack>
-
-      {/* Overlay Container */}
-      <YStack flex={1}>
-        {/* Top overlay */}
+        {/* Instructions - Positioned absolutely */}
         <YStack
-          style={[
-            styles.overlay,
-            {
-              height: (screenHeight - SCAN_AREA_SIZE) / 2,
-            },
-          ]}
-        />
+          position="absolute"
+          top={insets.top + 80}
+          left={0}
+          right={0}
+          alignItems="center"
+          zIndex={20}
+          pointerEvents="none"
+        >
+          <Text color="white" fontSize="$5" fontWeight="600" textAlign="center">
+            Scan Device QR Code
+          </Text>
+          <Text color="$gray10" fontSize="$3" textAlign="center" marginTop="$2">
+            Position the QR code within the frame
+          </Text>
+        </YStack>
+      </ZStack>
 
-        {/* Middle section with scan area */}
-        <XStack flex={0} height={SCAN_AREA_SIZE}>
-          {/* Left overlay */}
-          <YStack
-            style={styles.overlay}
-            width={(screenWidth - SCAN_AREA_SIZE) / 2}
-          />
-
-          {/* Scan area - transparent without border */}
-          <YStack
-            width={SCAN_AREA_SIZE}
-            height={SCAN_AREA_SIZE}
-            style={styles.scanArea}
-          />
-
-          {/* Right overlay */}
-          <YStack
-            style={styles.overlay}
-            width={(screenWidth - SCAN_AREA_SIZE) / 2}
-          />
-        </XStack>
-
-        {/* Bottom overlay */}
-        <YStack
-          style={[
-            styles.overlay,
-            {
-              height: (screenHeight - SCAN_AREA_SIZE) / 2,
-            },
-          ]}
-          flex={1}
-        />
-      </YStack>
-
-      {/* Manual Add Button - Positioned absolutely at bottom */}
+      {/* Bottom section with manual add button - Outside ZStack */}
       <YStack
         position="absolute"
         bottom={insets.bottom + 40}
         left={0}
         right={0}
         alignItems="center"
-        zIndex={10}
+        zIndex={30}
         paddingHorizontal="$4"
       >
         <Button
@@ -192,7 +215,7 @@ export const CameraScreen: React.FC = () => {
           or add manually
         </Button>
       </YStack>
-    </ZStack>
+    </YStack>
   );
 };
 

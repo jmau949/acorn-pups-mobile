@@ -11,4 +11,5 @@ export type BottomTabParamList = {
 export type AppStackParamList = {
   MainTabs: undefined;
   Camera: undefined;
+  BluetoothSearch: undefined;
 };

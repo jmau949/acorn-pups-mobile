@@ -1,4 +1,5 @@
 import { BottomTabNavigator } from "@/navigation/BottomTabNavigator";
+import { BluetoothSearchScreen } from "@/screens/BluetoothSearchScreen";
 import { CameraScreen } from "@/screens/CameraScreen";
 import { AppStackParamList } from "@/types/navigation";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -22,6 +23,7 @@ export const AppStack: React.FC = () => {
           presentation: "fullScreenModal",
         }}
       />
+      <Stack.Screen name="BluetoothSearch" component={BluetoothSearchScreen} />
     </Stack.Navigator>
   );
 };
