@@ -25,7 +25,8 @@
       "bundleIdentifier": "com.acornpups.yourapp",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "This app uses the camera to scan device QR codes for easy setup."
+        "NSCameraUsageDescription": "This app uses the camera to scan device QR codes for easy setup.",
+        "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to connect to your devices."
       }
     },
     "android": {
@@ -33,7 +34,16 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": ["android.permission.CAMERA"],
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        {
+          "name": "android.permission.BLUETOOTH_SCAN",
+          "usesPermissionFlags": "neverForLocation"
+        },
+        "android.permission.BLUETOOTH_CONNECT"
+      ],
       "edgeToEdgeEnabled": true
     },
     "web": {

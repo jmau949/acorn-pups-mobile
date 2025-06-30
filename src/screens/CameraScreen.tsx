@@ -1,12 +1,29 @@
+import { bleService } from "@/services/bleService";
+import { BleDevice, BleError } from "@/types/ble";
 import { AppStackParamList } from "@/types/navigation";
+import { parseQRCode } from "@/utils/qrCodeParser";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { CameraType, CameraView, useCameraPermissions } from "expo-camera";
-import React, { useEffect, useState } from "react";
-import { Dimensions, StyleSheet } from "react-native";
+import {
+  BarcodeScanningResult,
+  CameraType,
+  CameraView,
+  useCameraPermissions,
+} from "expo-camera";
+import React, { useEffect, useRef, useState } from "react";
+import { AppState, Dimensions, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button, Text, XStack, YStack, ZStack } from "tamagui";
+import {
+  Button,
+  Card,
+  Paragraph,
+  Spinner,
+  Text,
+  XStack,
+  YStack,
+  ZStack,
+} from "tamagui";
 
 type CameraScreenNavigationProp = NativeStackNavigationProp<
   AppStackParamList,
@@ -18,11 +35,30 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 // Scan area dimensions - make it bigger (80% of screen width)
 const SCAN_AREA_SIZE = Math.min(screenWidth * 0.8, 300);
 
+interface ScanState {
+  isScanning: boolean;
+  isConnecting: boolean;
+  isConnected: boolean;
+  error: string | null;
+  targetDeviceName: string | null;
+  foundDevice: BleDevice | null;
+}
+
 export const CameraScreen: React.FC = () => {
   const navigation = useNavigation<CameraScreenNavigationProp>();
   const insets = useSafeAreaInsets();
   const [facing, setFacing] = useState<CameraType>("back");
   const [permission, requestPermission] = useCameraPermissions();
+  const [scanState, setScanState] = useState<ScanState>({
+    isScanning: false,
+    isConnecting: false,
+    isConnected: false,
+    error: null,
+    targetDeviceName: null,
+    foundDevice: null,
+  });
+  const [qrScanned, setQrScanned] = useState(false);
+  const scanTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   useEffect(() => {
     if (!permission?.granted) {
@@ -30,12 +66,39 @@ export const CameraScreen: React.FC = () => {
     }
   }, [permission]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      bleService.stopScanning();
+      if (scanTimeoutRef.current) {
+        clearTimeout(scanTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Monitor app state to stop scanning when app goes to background
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState !== "active") {
+        bleService.stopScanning();
+      }
+    };
+
+    const subscription = AppState.addEventListener(
+      "change",
+      handleAppStateChange
+    );
+    return () => subscription?.remove();
+  }, []);
+
   const handleClose = () => {
+    bleService.stopScanning();
     navigation.goBack();
   };
 
   const handleManualAdd = () => {
     console.log("Manual add button pressed");
+    bleService.stopScanning();
 
     // Get the parent navigation to handle the transition properly
     const parentNavigation = navigation.getParent();
@@ -53,6 +116,195 @@ export const CameraScreen: React.FC = () => {
     }, 100);
   };
 
+  const handleQRCodeScanned = async (result: BarcodeScanningResult) => {
+    if (qrScanned || scanState.isScanning) {
+      return; // Prevent multiple scans
+    }
+
+    console.log("📷 [Camera] QR Code scanned:", {
+      data: result.data,
+      type: result.type,
+      timestamp: new Date().toISOString(),
+    });
+
+    setQrScanned(true);
+    const qrData = parseQRCode(result.data);
+
+    if (!qrData) {
+      console.log("❌ [Camera] Invalid QR code data:", { data: result.data });
+      setScanState((prev) => ({
+        ...prev,
+        error: "Invalid QR code. Please scan a valid device QR code.",
+      }));
+
+      // Allow scanning again after error
+      setTimeout(() => {
+        setQrScanned(false);
+        setScanState((prev) => ({ ...prev, error: null }));
+      }, 3000);
+      return;
+    }
+
+    console.log("✅ [Camera] QR code parsed successfully:", {
+      deviceName: qrData.deviceName,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Start BLE scanning for the specific device
+    setScanState((prev) => ({
+      ...prev,
+      isScanning: true,
+      targetDeviceName: qrData.deviceName,
+      error: null,
+    }));
+
+    console.log("🔍 [Camera] Starting BLE scan for target device:", {
+      targetDevice: qrData.deviceName,
+    });
+
+    try {
+      await bleService.startScanning(
+        qrData.deviceName,
+        (device: BleDevice) => {
+          console.log("📱 [Camera] Target device found:", {
+            deviceId: device.id,
+            deviceName: device.name,
+            rssi: device.rssi,
+            targetDevice: qrData.deviceName,
+          });
+
+          setScanState((prev) => ({
+            ...prev,
+            foundDevice: device,
+          }));
+
+          // Auto-connect to the first found device
+          console.log("🚀 [Camera] Auto-connecting to found device...");
+          handleConnectToDevice(device);
+        },
+        (error: string) => {
+          console.error("❌ [Camera] BLE scan error:", { error });
+          setScanState((prev) => ({
+            ...prev,
+            isScanning: false,
+            error: getErrorMessage(error),
+          }));
+        }
+      );
+
+      // Set timeout for scanning
+      scanTimeoutRef.current = setTimeout(() => {
+        console.log("⏰ [Camera] Scan timeout reached");
+        bleService.stopScanning();
+        setScanState((prev) => ({
+          ...prev,
+          isScanning: false,
+          error: prev.foundDevice
+            ? null
+            : "Device not found. Make sure it's turned on and in range.",
+        }));
+      }, 15000); // 15 seconds timeout
+    } catch (error) {
+      console.error("💥 [Camera] Failed to start BLE scan:", { error });
+      setScanState((prev) => ({
+        ...prev,
+        isScanning: false,
+        error: getErrorMessage(
+          error instanceof Error ? error.message : "Unknown error"
+        ),
+      }));
+    }
+  };
+
+  const handleConnectToDevice = async (device: BleDevice) => {
+    console.log("🔗 [Camera] Starting connection process:", {
+      deviceId: device.id,
+      deviceName: device.name,
+      timestamp: new Date().toISOString(),
+    });
+
+    setScanState((prev) => ({
+      ...prev,
+      isConnecting: true,
+      isScanning: false,
+    }));
+
+    bleService.stopScanning();
+
+    try {
+      await bleService.connectToDevice(device.id, (isConnected: boolean) => {
+        console.log("🔄 [Camera] Connection state changed:", {
+          deviceId: device.id,
+          deviceName: device.name,
+          isConnected,
+          timestamp: new Date().toISOString(),
+        });
+
+        setScanState((prev) => ({
+          ...prev,
+          isConnected,
+          isConnecting: false,
+        }));
+
+        if (isConnected) {
+          console.log(
+            "🎉 [Camera] Device connected successfully! Redirecting to main screen..."
+          );
+          // Success - go back to devices screen
+          setTimeout(() => {
+            navigation.navigate("MainTabs");
+          }, 2000);
+        } else {
+          console.log("🔌 [Camera] Device disconnected");
+        }
+      });
+    } catch (error) {
+      console.error("💥 [Camera] Connection failed:", {
+        deviceId: device.id,
+        deviceName: device.name,
+        error: error instanceof Error ? error.message : "Connection failed",
+        timestamp: new Date().toISOString(),
+      });
+
+      setScanState((prev) => ({
+        ...prev,
+        isConnecting: false,
+        error: getErrorMessage(
+          error instanceof Error ? error.message : "Connection failed"
+        ),
+      }));
+    }
+  };
+
+  const getErrorMessage = (error: string): string => {
+    switch (error) {
+      case BleError.PERMISSION_DENIED:
+        return "Bluetooth permissions required. Please enable Bluetooth permissions in Settings.";
+      case BleError.BLUETOOTH_DISABLED:
+        return "Bluetooth is disabled. Please enable Bluetooth and try again.";
+      case BleError.DEVICE_NOT_FOUND:
+        return "Device not found. Make sure it's turned on and in pairing mode.";
+      case BleError.CONNECTION_FAILED:
+        return "Failed to connect to device. Please try again.";
+      case BleError.SCANNING_FAILED:
+        return "Failed to scan for devices. Please try again.";
+      default:
+        return "An error occurred. Please try again.";
+    }
+  };
+
+  const handleRetry = () => {
+    setQrScanned(false);
+    setScanState({
+      isScanning: false,
+      isConnecting: false,
+      isConnected: false,
+      error: null,
+      targetDeviceName: null,
+      foundDevice: null,
+    });
+  };
+
   if (!permission) {
     // Camera permissions are still loading
     return (
@@ -62,7 +314,8 @@ export const CameraScreen: React.FC = () => {
         alignItems="center"
         backgroundColor="$background"
       >
-        <Text>Loading camera...</Text>
+        <Spinner size="large" color="$accentColor" />
+        <Text marginTop="$4">Loading camera...</Text>
       </YStack>
     );
   }
@@ -95,6 +348,196 @@ export const CameraScreen: React.FC = () => {
     );
   }
 
+  // Show scanning/connecting overlay
+  if (scanState.isScanning || scanState.isConnecting || scanState.isConnected) {
+    return (
+      <YStack flex={1} backgroundColor="black">
+        <ZStack flex={1}>
+          {/* Blurred camera background */}
+          <CameraView
+            style={[styles.camera, { opacity: 0.3 }]}
+            facing={facing}
+          />
+
+          {/* Overlay */}
+          <YStack
+            flex={1}
+            justifyContent="center"
+            alignItems="center"
+            backgroundColor="rgba(0, 0, 0, 0.7)"
+            paddingHorizontal="$4"
+          >
+            <Card
+              backgroundColor="rgba(255, 255, 255, 0.95)"
+              padding="$6"
+              borderRadius="$6"
+              alignItems="center"
+              space="$4"
+              minWidth={280}
+            >
+              {scanState.isScanning && (
+                <>
+                  <Spinner size="large" color="$accentColor" />
+                  <Text
+                    fontSize="$5"
+                    fontWeight="600"
+                    color="$color12"
+                    textAlign="center"
+                  >
+                    Searching for device...
+                  </Text>
+                  <Paragraph fontSize="$3" color="$color10" textAlign="center">
+                    Looking for "{scanState.targetDeviceName}"
+                  </Paragraph>
+                </>
+              )}
+
+              {scanState.isConnecting && (
+                <>
+                  <Spinner size="large" color="$accentColor" />
+                  <Text
+                    fontSize="$5"
+                    fontWeight="600"
+                    color="$color12"
+                    textAlign="center"
+                  >
+                    Connecting to device...
+                  </Text>
+                  <Paragraph fontSize="$3" color="$color10" textAlign="center">
+                    {scanState.foundDevice?.name}
+                  </Paragraph>
+                </>
+              )}
+
+              {scanState.isConnected && (
+                <>
+                  <YStack
+                    width={60}
+                    height={60}
+                    backgroundColor="$green10"
+                    borderRadius="$4"
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    <Ionicons name="checkmark" size={30} color="white" />
+                  </YStack>
+                  <Text
+                    fontSize="$5"
+                    fontWeight="600"
+                    color="$green10"
+                    textAlign="center"
+                  >
+                    Connected successfully!
+                  </Text>
+                  <Paragraph fontSize="$3" color="$color10" textAlign="center">
+                    Redirecting to devices...
+                  </Paragraph>
+                </>
+              )}
+            </Card>
+          </YStack>
+        </ZStack>
+
+        {/* Back Button */}
+        <YStack position="absolute" top={insets.top + 16} left={16} zIndex={20}>
+          <Button
+            size="$4"
+            circular
+            backgroundColor="rgba(0, 0, 0, 0.5)"
+            onPress={handleClose}
+            pressStyle={{ backgroundColor: "rgba(0, 0, 0, 0.7)" }}
+          >
+            <Ionicons name="chevron-back" size={24} color="white" />
+          </Button>
+        </YStack>
+      </YStack>
+    );
+  }
+
+  // Show error state
+  if (scanState.error) {
+    return (
+      <YStack flex={1} backgroundColor="black">
+        <ZStack flex={1}>
+          {/* Blurred camera background */}
+          <CameraView
+            style={[styles.camera, { opacity: 0.3 }]}
+            facing={facing}
+          />
+
+          {/* Error overlay */}
+          <YStack
+            flex={1}
+            justifyContent="center"
+            alignItems="center"
+            backgroundColor="rgba(0, 0, 0, 0.7)"
+            paddingHorizontal="$4"
+          >
+            <Card
+              backgroundColor="rgba(255, 255, 255, 0.95)"
+              padding="$6"
+              borderRadius="$6"
+              alignItems="center"
+              space="$4"
+              minWidth={280}
+            >
+              <YStack
+                width={60}
+                height={60}
+                backgroundColor="$red10"
+                borderRadius="$4"
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Ionicons name="alert" size={30} color="white" />
+              </YStack>
+
+              <Text
+                fontSize="$5"
+                fontWeight="600"
+                color="$red10"
+                textAlign="center"
+              >
+                Connection Error
+              </Text>
+
+              <Paragraph fontSize="$3" color="$color10" textAlign="center">
+                {scanState.error}
+              </Paragraph>
+
+              <XStack space="$3" marginTop="$2">
+                <Button
+                  onPress={handleRetry}
+                  backgroundColor="$accentColor"
+                  color="white"
+                  flex={1}
+                >
+                  Try Again
+                </Button>
+                <Button onPress={handleClose} variant="outlined" flex={1}>
+                  Cancel
+                </Button>
+              </XStack>
+            </Card>
+          </YStack>
+        </ZStack>
+
+        {/* Back Button */}
+        <YStack position="absolute" top={insets.top + 16} left={16} zIndex={20}>
+          <Button
+            size="$4"
+            circular
+            backgroundColor="rgba(0, 0, 0, 0.5)"
+            onPress={handleClose}
+            pressStyle={{ backgroundColor: "rgba(0, 0, 0, 0.7)" }}
+          >
+            <Ionicons name="chevron-back" size={24} color="white" />
+          </Button>
+        </YStack>
+      </YStack>
+    );
+  }
+
   return (
     <YStack flex={1} backgroundColor="black">
       {/* Camera View - Full Screen */}
@@ -105,6 +548,7 @@ export const CameraScreen: React.FC = () => {
           barcodeScannerSettings={{
             barcodeTypes: ["qr", "pdf417"],
           }}
+          onBarcodeScanned={handleQRCodeScanned}
         />
 
         {/* Overlay Container */}
