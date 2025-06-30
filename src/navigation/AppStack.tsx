@@ -1,5 +1,6 @@
 import { BottomTabNavigator } from "@/navigation/BottomTabNavigator";
-import { AppStackParamList } from "@/types/auth";
+import { CameraScreen } from "@/screens/CameraScreen";
+import { AppStackParamList } from "@/types/navigation";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
 
@@ -14,6 +15,13 @@ export const AppStack: React.FC = () => {
       }}
     >
       <Stack.Screen name="MainTabs" component={BottomTabNavigator} />
+      <Stack.Screen
+        name="Camera"
+        component={CameraScreen}
+        options={{
+          presentation: "fullScreenModal",
+        }}
+      />
     </Stack.Navigator>
   );
 };

@@ -1,10 +1,20 @@
+import { AppStackParamList } from "@/types/navigation";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React from "react";
 import { ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, Card, H1, Text, XStack, YStack } from "tamagui";
 
+type DevicesScreenNavigationProp = NativeStackNavigationProp<AppStackParamList>;
+
 export const DevicesScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<DevicesScreenNavigationProp>();
+
+  const handleAddDevice = () => {
+    navigation.navigate("Camera");
+  };
 
   return (
     <YStack
@@ -98,7 +108,12 @@ export const DevicesScreen: React.FC = () => {
 
           {/* Add Device Button */}
           <YStack flex={1} justifyContent="flex-end">
-            <Button size="$5" backgroundColor="$accentColor" color="white">
+            <Button
+              size="$5"
+              backgroundColor="$accentColor"
+              color="white"
+              onPress={handleAddDevice}
+            >
               Add New Device
             </Button>
           </YStack>
