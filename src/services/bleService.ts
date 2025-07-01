@@ -147,7 +147,14 @@ class BleService {
         }
 
         // Filter for target device if specified
-        if (targetDeviceName && !device.name.includes(targetDeviceName)) {
+        if (targetDeviceName && !device.name.startsWith("AcornPups-")) {
+          console.log(
+            "⏭️ [BLE] Device does not match AcornPups pattern, skipping:",
+            {
+              deviceName: device.name,
+              expectedPattern: "AcornPups-*",
+            }
+          );
           return;
         }
 
@@ -156,9 +163,7 @@ class BleService {
           name: device.name,
           rssi: device.rssi,
           isConnectable: device.isConnectable,
-          targetMatch: targetDeviceName
-            ? device.name.includes(targetDeviceName)
-            : "N/A",
+          matchesPattern: device.name.startsWith("AcornPups-"),
         });
 
         // Convert to our BleDevice format

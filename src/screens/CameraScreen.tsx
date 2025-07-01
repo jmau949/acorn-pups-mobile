@@ -66,6 +66,16 @@ export const CameraScreen: React.FC = () => {
     }
   }, [permission]);
 
+  // Log helpful QR code examples for testing
+  useEffect(() => {
+    console.log("📋 [Camera] QR Code examples that should work:");
+    console.log('📋 [Camera] JSON format: {"deviceName": "AcornPups-B901"}');
+    console.log("📋 [Camera] Plain text: AcornPups-B901");
+    console.log(
+      '📋 [Camera] Note: Device name must be exactly "AcornPups-{deviceid}" format'
+    );
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -164,13 +174,30 @@ export const CameraScreen: React.FC = () => {
 
     try {
       await bleService.startScanning(
-        qrData.deviceName,
+        "AcornPups", // Filter for AcornPups-{deviceid} devices
         (device: BleDevice) => {
-          console.log("📱 [Camera] Target device found:", {
+          console.log("📱 [Camera] AcornPups device found during QR scan:", {
             deviceId: device.id,
             deviceName: device.name,
             rssi: device.rssi,
-            targetDevice: qrData.deviceName,
+            qrTargetName: qrData.deviceName,
+          });
+
+          // Check if this device matches the exact QR code device name
+          if (device.name !== qrData.deviceName) {
+            console.log(
+              "⏭️ [Camera] Device name does not match QR code exactly, skipping:",
+              {
+                foundDeviceName: device.name,
+                qrTargetName: qrData.deviceName,
+              }
+            );
+            return;
+          }
+
+          console.log("🎯 [Camera] Found exact matching device from QR code!", {
+            deviceName: device.name,
+            qrTargetName: qrData.deviceName,
           });
 
           setScanState((prev) => ({
@@ -178,8 +205,8 @@ export const CameraScreen: React.FC = () => {
             foundDevice: device,
           }));
 
-          // Auto-connect to the first found device
-          console.log("🚀 [Camera] Auto-connecting to found device...");
+          // Auto-connect to the found device
+          console.log("🚀 [Camera] Auto-connecting to matching device...");
           handleConnectToDevice(device);
         },
         (error: string) => {

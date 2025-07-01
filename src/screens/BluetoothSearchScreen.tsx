@@ -77,7 +77,7 @@ export const BluetoothSearchScreen: React.FC = () => {
       const foundDevices = new Map<string, BleDevice>();
 
       await bleService.startScanning(
-        "acorn-pups", // Filter for acorn-pups devices
+        "AcornPups", // Filter specifically for AcornPups-{deviceid} devices
         (device: BleDevice) => {
           console.log("📱 [BluetoothSearch] Device discovered:", {
             deviceId: device.id,
