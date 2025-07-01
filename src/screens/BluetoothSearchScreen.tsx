@@ -212,9 +212,9 @@ export const BluetoothSearchScreen: React.FC = () => {
 
         if (isConnected) {
           console.log(
-            "🎉 [BluetoothSearch] Connection successful! Cleaning up UI..."
+            "🎉 [BluetoothSearch] Connection successful! Navigating to WiFi provisioning..."
           );
-          // Success - go back to devices screen
+          // Success - go to WiFi provisioning screen
           setState((prev) => ({
             ...prev,
             isConnecting: false,
@@ -222,10 +222,12 @@ export const BluetoothSearchScreen: React.FC = () => {
           }));
 
           console.log(
-            "🎉 [BluetoothSearch] Redirecting to main screen in 1 second..."
+            "📡 [BluetoothSearch] Redirecting to WiFi provisioning..."
           );
           setTimeout(() => {
-            navigation.navigate("MainTabs");
+            navigation.navigate("WiFiProvisioning", {
+              connectedDevice: device,
+            });
           }, 1000);
         } else {
           console.log("🔌 [BluetoothSearch] Connection lost unexpectedly");

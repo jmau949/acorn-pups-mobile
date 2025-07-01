@@ -6,6 +6,7 @@ class BleService {
   private manager: BleManager;
   private scanningTimeout?: NodeJS.Timeout;
   private readonly SCAN_TIMEOUT = 10000; // 10 seconds
+  private connectedDevice: Device | null = null;
 
   constructor() {
     console.log("🔧 [BLE] BLE Service instantiated");
@@ -230,6 +231,9 @@ class BleService {
         timestamp: new Date().toISOString(),
       });
 
+      // Store the connected device
+      this.connectedDevice = device;
+
       // Monitor connection state
       device.onDisconnected((error, disconnectedDevice) => {
         console.log("🔌 [BLE] Device disconnected:", {
@@ -238,6 +242,9 @@ class BleService {
           error: error?.message,
           timestamp: new Date().toISOString(),
         });
+
+        // Clear stored device
+        this.connectedDevice = null;
         onConnectionStateChange?.(false);
       });
 
@@ -255,12 +262,32 @@ class BleService {
   }
 
   /**
+   * Get the currently connected device
+   */
+  async getConnectedDevice(deviceId: string): Promise<Device | null> {
+    if (this.connectedDevice && this.connectedDevice.id === deviceId) {
+      console.log("📱 [BLE] Returning stored connected device:", {
+        deviceId: this.connectedDevice.id,
+        deviceName: this.connectedDevice.name,
+      });
+      return this.connectedDevice;
+    }
+
+    console.log("❌ [BLE] No connected device found for ID:", { deviceId });
+    return null;
+  }
+
+  /**
    * Disconnect from a BLE device
    */
   async disconnectDevice(deviceId: string): Promise<void> {
     try {
       console.log("🔌 [BLE] Manually disconnecting device:", { deviceId });
       await this.manager.cancelDeviceConnection(deviceId);
+
+      // Clear stored device
+      this.connectedDevice = null;
+
       console.log("✅ [BLE] Device disconnected successfully:", { deviceId });
     } catch (error) {
       console.error("❌ [BLE] Failed to disconnect device:", {

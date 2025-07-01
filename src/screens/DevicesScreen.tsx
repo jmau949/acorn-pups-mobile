@@ -13,7 +13,8 @@ export const DevicesScreen: React.FC = () => {
   const navigation = useNavigation<DevicesScreenNavigationProp>();
 
   const handleAddDevice = () => {
-    navigation.navigate("Camera");
+    console.log("Add device button pressed");
+    navigation.navigate("DeviceSetupModal");
   };
 
   return (

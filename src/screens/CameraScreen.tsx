@@ -1,6 +1,6 @@
 import { bleService } from "@/services/bleService";
-import { BleDevice, BleError } from "@/types/ble";
-import { AppStackParamList } from "@/types/navigation";
+import { BleDevice, BleError, QRCodeData } from "@/types/ble";
+import { DeviceSetupModalParamList } from "@/types/navigation";
 import { parseQRCode } from "@/utils/qrCodeParser";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -26,7 +26,7 @@ import {
 } from "tamagui";
 
 type CameraScreenNavigationProp = NativeStackNavigationProp<
-  AppStackParamList,
+  DeviceSetupModalParamList,
   "Camera"
 >;
 
@@ -49,6 +49,7 @@ export const CameraScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const [facing, setFacing] = useState<CameraType>("back");
   const [permission, requestPermission] = useCameraPermissions();
+  const [qrScanned, setQrScanned] = useState(false);
   const [scanState, setScanState] = useState<ScanState>({
     isScanning: false,
     isConnecting: false,
@@ -57,14 +58,15 @@ export const CameraScreen: React.FC = () => {
     targetDeviceName: null,
     foundDevice: null,
   });
-  const [qrScanned, setQrScanned] = useState(false);
+
   const scanTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const deviceFoundRef = useRef(false);
 
   useEffect(() => {
     if (!permission?.granted) {
       requestPermission();
     }
-  }, [permission]);
+  }, [permission, requestPermission]);
 
   // Log helpful QR code examples for testing
   useEffect(() => {
@@ -127,56 +129,84 @@ export const CameraScreen: React.FC = () => {
   };
 
   const handleQRCodeScanned = async (result: BarcodeScanningResult) => {
-    if (qrScanned || scanState.isScanning) {
-      return; // Prevent multiple scans
+    // Prevent multiple scans
+    if (qrScanned || scanState.isScanning || scanState.isConnecting) {
+      console.log("⏭️ [Camera] QR scan ignored - already processing:", {
+        qrScanned,
+        isScanning: scanState.isScanning,
+        isConnecting: scanState.isConnecting,
+      });
+      return;
     }
 
-    console.log("📷 [Camera] QR Code scanned:", {
+    console.log("📷 [Camera] QR code scanned:", {
       data: result.data,
-      type: result.type,
       timestamp: new Date().toISOString(),
     });
 
-    setQrScanned(true);
     const qrData = parseQRCode(result.data);
-
     if (!qrData) {
-      console.log("❌ [Camera] Invalid QR code data:", { data: result.data });
+      console.log("❌ [Camera] Invalid QR code data");
       setScanState((prev) => ({
         ...prev,
         error: "Invalid QR code. Please scan a valid device QR code.",
       }));
-
-      // Allow scanning again after error
-      setTimeout(() => {
-        setQrScanned(false);
-        setScanState((prev) => ({ ...prev, error: null }));
-      }, 3000);
       return;
     }
 
-    console.log("✅ [Camera] QR code parsed successfully:", {
+    console.log("✅ [Camera] Valid QR code parsed:", {
       deviceName: qrData.deviceName,
-      timestamp: new Date().toISOString(),
     });
 
-    // Start BLE scanning for the specific device
+    setQrScanned(true);
+    deviceFoundRef.current = false; // Reset device found flag
     setScanState((prev) => ({
       ...prev,
-      isScanning: true,
       targetDeviceName: qrData.deviceName,
       error: null,
     }));
 
-    console.log("🔍 [Camera] Starting BLE scan for target device:", {
+    // Start BLE scan to find the target device
+    await startBleScan(qrData);
+  };
+
+  const startBleScan = async (qrData: QRCodeData) => {
+    console.log("🔍 [Camera] Starting BLE scan for device:", {
       targetDevice: qrData.deviceName,
     });
 
+    // Reset discovery flag
+    deviceFoundRef.current = false;
+
+    setScanState((prev) => ({
+      ...prev,
+      isScanning: true,
+      error: null,
+    }));
+
     try {
       await bleService.startScanning(
-        "AcornPups", // Filter for AcornPups-{deviceid} devices
+        "AcornPups",
         (device: BleDevice) => {
-          console.log("📱 [Camera] AcornPups device found during QR scan:", {
+          // Skip if we already found and are processing a device
+          if (
+            deviceFoundRef.current ||
+            scanState.isConnecting ||
+            scanState.isConnected
+          ) {
+            console.log(
+              "⏭️ [Camera] Device discovery ignored - already found/connecting:",
+              {
+                deviceFoundRef: deviceFoundRef.current,
+                isConnecting: scanState.isConnecting,
+                isConnected: scanState.isConnected,
+                deviceName: device.name,
+              }
+            );
+            return;
+          }
+
+          console.log("📱 [Camera] Discovered device:", {
             deviceId: device.id,
             deviceName: device.name,
             rssi: device.rssi,
@@ -200,14 +230,30 @@ export const CameraScreen: React.FC = () => {
             qrTargetName: qrData.deviceName,
           });
 
+          // Mark as found IMMEDIATELY to prevent multiple connection attempts
+          deviceFoundRef.current = true;
+
           setScanState((prev) => ({
             ...prev,
             foundDevice: device,
+            isScanning: false,
           }));
 
-          // Auto-connect to the found device
-          console.log("🚀 [Camera] Auto-connecting to matching device...");
-          handleConnectToDevice(device);
+          // Stop scanning immediately
+          console.log("🛑 [Camera] Stopping scan and cleaning up timeouts...");
+          bleService.stopScanning();
+          if (scanTimeoutRef.current) {
+            clearTimeout(scanTimeoutRef.current);
+            scanTimeoutRef.current = undefined;
+          }
+
+          // Auto-connect to the found device with a small delay
+          console.log(
+            "🚀 [Camera] Auto-connecting to matching device in 500ms..."
+          );
+          setTimeout(() => {
+            handleConnectToDevice(device);
+          }, 500);
         },
         (error: string) => {
           console.error("❌ [Camera] BLE scan error:", { error });
@@ -221,15 +267,15 @@ export const CameraScreen: React.FC = () => {
 
       // Set timeout for scanning
       scanTimeoutRef.current = setTimeout(() => {
-        console.log("⏰ [Camera] Scan timeout reached");
-        bleService.stopScanning();
-        setScanState((prev) => ({
-          ...prev,
-          isScanning: false,
-          error: prev.foundDevice
-            ? null
-            : "Device not found. Make sure it's turned on and in range.",
-        }));
+        if (!deviceFoundRef.current) {
+          console.log("⏰ [Camera] Scan timeout reached, device not found");
+          bleService.stopScanning();
+          setScanState((prev) => ({
+            ...prev,
+            isScanning: false,
+            error: "Device not found. Make sure it's turned on and in range.",
+          }));
+        }
       }, 15000); // 15 seconds timeout
     } catch (error) {
       console.error("💥 [Camera] Failed to start BLE scan:", { error });
@@ -244,6 +290,18 @@ export const CameraScreen: React.FC = () => {
   };
 
   const handleConnectToDevice = async (device: BleDevice) => {
+    // Prevent multiple connection attempts
+    if (scanState.isConnecting || scanState.isConnected) {
+      console.log(
+        "⏭️ [Camera] Connection attempt ignored - already connecting/connected:",
+        {
+          isConnecting: scanState.isConnecting,
+          isConnected: scanState.isConnected,
+        }
+      );
+      return;
+    }
+
     console.log("🔗 [Camera] Starting connection process:", {
       deviceId: device.id,
       deviceName: device.name,
@@ -256,7 +314,12 @@ export const CameraScreen: React.FC = () => {
       isScanning: false,
     }));
 
+    // Ensure scanning is stopped
     bleService.stopScanning();
+    if (scanTimeoutRef.current) {
+      clearTimeout(scanTimeoutRef.current);
+      scanTimeoutRef.current = undefined;
+    }
 
     try {
       await bleService.connectToDevice(device.id, (isConnected: boolean) => {
@@ -267,22 +330,51 @@ export const CameraScreen: React.FC = () => {
           timestamp: new Date().toISOString(),
         });
 
-        setScanState((prev) => ({
-          ...prev,
-          isConnected,
-          isConnecting: false,
-        }));
-
         if (isConnected) {
           console.log(
-            "🎉 [Camera] Device connected successfully! Redirecting to main screen..."
+            "🎉 [Camera] Device connected successfully! Navigating to WiFi provisioning..."
           );
-          // Success - go back to devices screen
+
+          setScanState((prev) => ({
+            ...prev,
+            isConnected: true,
+            isConnecting: false,
+            error: null,
+          }));
+
+          // Success - go to WiFi provisioning screen
+          console.log(
+            "📡 [Camera] Setting up navigation to WiFi provisioning in 1.5 seconds..."
+          );
           setTimeout(() => {
-            navigation.navigate("MainTabs");
-          }, 2000);
+            console.log(
+              "🚀 [Camera] Attempting navigation to WiFiProvisioning..."
+            );
+            try {
+              navigation.navigate("WiFiProvisioning", {
+                connectedDevice: device,
+              });
+              console.log(
+                "✅ [Camera] Navigation to WiFiProvisioning initiated"
+              );
+            } catch (error) {
+              console.error("💥 [Camera] Navigation failed:", error);
+              // Fallback - try going back and then navigating
+              navigation.goBack();
+              setTimeout(() => {
+                navigation.navigate("WiFiProvisioning", {
+                  connectedDevice: device,
+                });
+              }, 100);
+            }
+          }, 1500);
         } else {
           console.log("🔌 [Camera] Device disconnected");
+          setScanState((prev) => ({
+            ...prev,
+            isConnected: false,
+            isConnecting: false,
+          }));
         }
       });
     } catch (error) {
@@ -296,6 +388,7 @@ export const CameraScreen: React.FC = () => {
       setScanState((prev) => ({
         ...prev,
         isConnecting: false,
+        isConnected: false,
         error: getErrorMessage(
           error instanceof Error ? error.message : "Connection failed"
         ),
@@ -321,7 +414,9 @@ export const CameraScreen: React.FC = () => {
   };
 
   const handleRetry = () => {
+    console.log("🔄 [Camera] Retrying camera scan...");
     setQrScanned(false);
+    deviceFoundRef.current = false;
     setScanState({
       isScanning: false,
       isConnecting: false,
@@ -457,8 +552,38 @@ export const CameraScreen: React.FC = () => {
                     Connected successfully!
                   </Text>
                   <Paragraph fontSize="$3" color="$color10" textAlign="center">
-                    Redirecting to devices...
+                    Proceeding to WiFi setup...
                   </Paragraph>
+                  <Paragraph fontSize="$2" color="$color8" textAlign="center">
+                    Device: {scanState.foundDevice?.name}
+                  </Paragraph>
+
+                  {/* Manual test button for WiFi provisioning */}
+                  <Button
+                    size="$4"
+                    backgroundColor="$blue10"
+                    color="white"
+                    onPress={() => {
+                      console.log("🔘 [Camera] Manual WiFi button pressed");
+                      console.log("🔍 [Camera] Device for manual WiFi setup:", {
+                        deviceId: scanState.foundDevice?.id,
+                        deviceName: scanState.foundDevice?.name,
+                      });
+                      try {
+                        navigation.navigate("WiFiProvisioning", {
+                          connectedDevice: scanState.foundDevice!,
+                        });
+                        console.log("✅ [Camera] Manual navigation initiated");
+                      } catch (error) {
+                        console.error(
+                          "💥 [Camera] Manual navigation failed:",
+                          error
+                        );
+                      }
+                    }}
+                  >
+                    Setup WiFi Manually
+                  </Button>
                 </>
               )}
             </Card>
@@ -598,11 +723,14 @@ export const CameraScreen: React.FC = () => {
               width={(screenWidth - SCAN_AREA_SIZE) / 2}
             />
 
-            {/* Scan area - transparent without border */}
+            {/* Scan area - transparent with border */}
             <YStack
               width={SCAN_AREA_SIZE}
               height={SCAN_AREA_SIZE}
               style={styles.scanArea}
+              borderWidth={3}
+              borderColor="white"
+              borderRadius="$4"
             />
 
             {/* Right overlay */}
@@ -674,16 +802,16 @@ export const CameraScreen: React.FC = () => {
       >
         <Button
           onPress={handleManualAdd}
-          backgroundColor="rgba(255, 255, 255, 0.2)"
+          backgroundColor="rgba(0, 0, 0, 0.6)"
           borderColor="rgba(255, 255, 255, 0.4)"
           borderWidth={1}
           color="white"
           size="$4"
           minWidth={180}
           fontSize="$3"
-          pressStyle={{ backgroundColor: "rgba(255, 255, 255, 0.3)" }}
+          pressStyle={{ backgroundColor: "rgba(0, 0, 0, 0.8)" }}
         >
-          or add manually
+          Add Device Manually
         </Button>
       </YStack>
     </YStack>
