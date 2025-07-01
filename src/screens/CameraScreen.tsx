@@ -140,13 +140,9 @@ export const CameraScreen: React.FC = () => {
       return; // Silently ignore rapid scans
     }
 
-    // Prevent multiple scans
+    // This check should now be unnecessary since camera scanning is disabled during processing,
+    // but keeping as a safety fallback
     if (qrScanned || scanState.isScanning || scanState.isConnecting) {
-      console.log("⏭️ [Camera] QR scan ignored - already processing:", {
-        qrScanned,
-        isScanning: scanState.isScanning,
-        isConnecting: scanState.isConnecting,
-      });
       return;
     }
 
@@ -717,10 +713,24 @@ export const CameraScreen: React.FC = () => {
         <CameraView
           style={styles.camera}
           facing={facing}
-          barcodeScannerSettings={{
-            barcodeTypes: ["qr", "pdf417"],
-          }}
-          onBarcodeScanned={handleQRCodeScanned}
+          barcodeScannerSettings={
+            qrScanned ||
+            scanState.isScanning ||
+            scanState.isConnecting ||
+            scanState.isConnected
+              ? undefined // Disable scanning during processing
+              : {
+                  barcodeTypes: ["qr", "pdf417"],
+                }
+          }
+          onBarcodeScanned={
+            qrScanned ||
+            scanState.isScanning ||
+            scanState.isConnecting ||
+            scanState.isConnected
+              ? undefined // Disable callback during processing
+              : handleQRCodeScanned
+          }
         />
 
         {/* Overlay Container */}
