@@ -10,6 +10,22 @@ export interface WiFiProvisioningState {
   progress: string | null;
 }
 
+export interface WiFiProvisioningStatus {
+  phase:
+    | "scanning"
+    | "connecting"
+    | "sending"
+    | "processing"
+    | "complete"
+    | "error";
+  progress: number; // 0-100
+  message: string;
+  isComplete: boolean;
+  isError: boolean;
+  error?: string;
+  warning?: string;
+}
+
 export enum WiFiProvisioningError {
   SERVICE_NOT_FOUND = "SERVICE_NOT_FOUND",
   CHARACTERISTIC_NOT_FOUND = "CHARACTERISTIC_NOT_FOUND",

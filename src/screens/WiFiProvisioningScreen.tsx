@@ -1,10 +1,10 @@
 import { wifiProvisioningService } from "@/services/wifiProvisioningService";
 import { DeviceSetupModalParamList } from "@/types/navigation";
-import { WiFiCredentials, WiFiProvisioningState } from "@/types/wifi";
+import { WiFiCredentials, WiFiProvisioningStatus } from "@/types/wifi";
 import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Button,
@@ -44,13 +44,18 @@ export const WiFiProvisioningScreen: React.FC = () => {
     password: "x", // Your WiFi password
   };
 
-  const [provisioningState, setProvisioningState] =
-    useState<WiFiProvisioningState>({
-      isProvisioning: false,
-      isComplete: false,
-      error: null,
-      progress: null,
-    });
+  // Use the new status system instead of the old state
+  const [status, setStatus] = useState<WiFiProvisioningStatus>({
+    phase: "scanning",
+    progress: 0,
+    message: "🔄 Preparing WiFi Setup...",
+    isComplete: false,
+    isError: false,
+  });
+
+  // Ref to track current status for timeouts
+  const statusRef = useRef(status);
+  statusRef.current = status;
 
   // Early error check
   useEffect(() => {
@@ -83,7 +88,11 @@ export const WiFiProvisioningScreen: React.FC = () => {
         handleAutomaticProvision();
       }, 1000);
 
-      return () => clearTimeout(provisionTimer);
+      return () => {
+        clearTimeout(provisionTimer);
+        // Cleanup service when component unmounts
+        wifiProvisioningService.cleanup();
+      };
     } catch (error) {
       console.error(
         "💥 [WiFiScreen] Error during screen initialization:",
@@ -148,7 +157,7 @@ export const WiFiProvisioningScreen: React.FC = () => {
   }
 
   const handleBack = () => {
-    if (provisioningState.isProvisioning) {
+    if (status.phase === "sending" || status.phase === "processing") {
       console.log("⚠️ [WiFiScreen] Cannot go back during provisioning");
       return;
     }
@@ -168,21 +177,33 @@ export const WiFiProvisioningScreen: React.FC = () => {
     }
   };
 
+  const handleStatusUpdate = (newStatus: WiFiProvisioningStatus) => {
+    console.log("📊 [WiFiScreen] Status update received:", newStatus);
+    setStatus(newStatus);
+
+    // Auto-close on success
+    if (newStatus.isComplete && !newStatus.isError) {
+      console.log(
+        "✅ [WiFiScreen] Provisioning completed successfully, closing modal in 3 seconds"
+      );
+      setTimeout(() => {
+        handleSkip();
+      }, 3000);
+    }
+  };
+
   const handleAutomaticProvision = async () => {
     if (!connectedDevice) {
-      setProvisioningState((prev) => ({
-        ...prev,
+      setStatus({
+        phase: "error",
+        progress: 0,
+        message: "❌ No device connected",
+        isComplete: true,
+        isError: true,
         error: "No device connected.",
-      }));
+      });
       return;
     }
-
-    setProvisioningState((prev) => ({
-      ...prev,
-      isProvisioning: true,
-      error: null,
-      progress: "Initializing WiFi provisioning...",
-    }));
 
     try {
       console.log(
@@ -193,67 +214,129 @@ export const WiFiProvisioningScreen: React.FC = () => {
         }
       );
 
-      // Initialize WiFi provisioning service
-      setProvisioningState((prev) => ({
-        ...prev,
-        progress: "Connecting to device services...",
-      }));
+      // Step 1: Update status to connecting
+      setStatus({
+        phase: "connecting",
+        progress: 10,
+        message: "🔧 Setting up WiFi provisioning...",
+        isComplete: false,
+        isError: false,
+      });
 
+      // Initialize WiFi provisioning service
+      console.log("📡 [WiFiScreen] Initializing WiFi provisioning service...");
       await wifiProvisioningService.initialize(connectedDevice.id);
 
-      // Send WiFi credentials
-      setProvisioningState((prev) => ({
-        ...prev,
-        progress: "Sending WiFi credentials...",
-      }));
+      // Step 2: Subscribe to status notifications BEFORE sending credentials
+      setStatus({
+        phase: "connecting",
+        progress: 20,
+        message: "📡 Subscribing to device notifications...",
+        isComplete: false,
+        isError: false,
+      });
 
+      console.log("📡 [WiFiScreen] Subscribing to status notifications...");
+      await wifiProvisioningService.subscribeToStatus(handleStatusUpdate);
+
+      // Step 3: Send WiFi credentials
+      setStatus({
+        phase: "sending",
+        progress: 25,
+        message: "📤 Sending WiFi credentials...",
+        isComplete: false,
+        isError: false,
+      });
+
+      console.log("📤 [WiFiScreen] Sending WiFi credentials...");
       await wifiProvisioningService.sendWiFiCredentials(automaticCredentials);
 
-      // Success!
-      setProvisioningState((prev) => ({
-        ...prev,
-        isProvisioning: false,
-        isComplete: true,
-        progress: "WiFi credentials sent successfully!",
-      }));
-
       console.log(
-        "✅ [WiFiScreen] Automatic WiFi provisioning completed successfully"
+        "✅ [WiFiScreen] WiFi credentials sent, waiting for device status updates..."
       );
 
-      // Auto-close after success
+      // Status updates will now be handled by the handleStatusUpdate callback
+      // The device will send real-time updates: RECEIVED -> PROCESSING -> STORED -> SUCCESS
+
+      // Fallback: If no status updates received within 5 seconds, show intermediate progress
       setTimeout(() => {
-        handleSkip();
-      }, 2000);
+        if (statusRef.current.progress <= 25) {
+          setStatus((prev) => ({
+            ...prev,
+            phase: "processing",
+            progress: 50,
+            message:
+              "🔄 Processing credentials... (no status updates received)",
+            warning:
+              "Status notifications may not be working, but credentials were sent",
+          }));
+        }
+      }, 5000);
+
+      // Another fallback: If still no updates after 15 seconds, assume success
+      setTimeout(() => {
+        if (statusRef.current.progress <= 50) {
+          setStatus((prev) => ({
+            ...prev,
+            phase: "complete",
+            progress: 100,
+            message: "✅ WiFi credentials sent successfully!",
+            isComplete: true,
+            isError: false,
+            warning:
+              "No status confirmation received, but device likely connected to WiFi",
+          }));
+        }
+      }, 15000);
     } catch (error) {
       console.error("💥 [WiFiScreen] WiFi provisioning failed:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error occurred";
 
-      setProvisioningState((prev) => ({
-        ...prev,
-        isProvisioning: false,
+      setStatus({
+        phase: "error",
+        progress: 0,
+        message: "❌ WiFi Setup Failed",
+        isComplete: true,
+        isError: true,
         error: wifiProvisioningService.getErrorMessage(errorMessage),
-      }));
+      });
     }
   };
 
   const handleRetry = () => {
     console.log("🔄 [WiFiScreen] Retrying WiFi provisioning");
-    handleAutomaticProvision();
+    // Reset status and try again
+    setStatus({
+      phase: "scanning",
+      progress: 0,
+      message: "🔄 Preparing WiFi Setup...",
+      isComplete: false,
+      isError: false,
+    });
+
+    setTimeout(() => {
+      handleAutomaticProvision();
+    }, 500);
   };
 
-  const getProgressText = () => {
-    if (provisioningState.isComplete) {
-      return "✅ WiFi Setup Complete!";
+  const getStatusIcon = () => {
+    if (status.phase === "sending" || status.phase === "processing") {
+      return <Spinner size="large" color="$blue10" />;
     }
-    if (provisioningState.error) {
-      return "❌ WiFi Setup Failed";
+    if (status.isComplete && !status.isError) {
+      return <Ionicons name="checkmark-circle" size={48} color="#22c55e" />;
     }
-    if (provisioningState.isProvisioning) {
-      return "📡 Setting up WiFi...";
+    if (status.isError) {
+      return <Ionicons name="close-circle" size={48} color="#ef4444" />;
     }
-    return "🔄 Preparing WiFi Setup...";
+    return <Ionicons name="wifi" size={48} color="#3b82f6" />;
+  };
+
+  const getStatusColor = () => {
+    if (status.isComplete && !status.isError) return "$green";
+    if (status.isError) return "$red";
+    return "$blue";
   };
 
   return (
@@ -276,7 +359,7 @@ export const WiFiProvisioningScreen: React.FC = () => {
           size="$4"
           variant="outlined"
           onPress={handleBack}
-          disabled={provisioningState.isProvisioning}
+          disabled={status.phase === "sending" || status.phase === "processing"}
           icon={<Ionicons name="chevron-back" size={20} />}
         >
           Back
@@ -290,7 +373,7 @@ export const WiFiProvisioningScreen: React.FC = () => {
           size="$4"
           variant="outlined"
           onPress={handleSkip}
-          disabled={provisioningState.isProvisioning}
+          disabled={status.phase === "sending" || status.phase === "processing"}
         >
           Skip
         </Button>
@@ -326,70 +409,71 @@ export const WiFiProvisioningScreen: React.FC = () => {
             </YStack>
           </Card>
 
-          {/* Status Card */}
+          {/* Status Card with Progress */}
           <Card
             padding="$6"
             width="100%"
             borderRadius="$4"
-            backgroundColor={
-              provisioningState.isComplete
-                ? "$green2"
-                : provisioningState.error
-                ? "$red2"
-                : "$blue2"
-            }
-            borderColor={
-              provisioningState.isComplete
-                ? "$green6"
-                : provisioningState.error
-                ? "$red6"
-                : "$blue6"
-            }
+            backgroundColor={`${getStatusColor()}2`}
+            borderColor={`${getStatusColor()}6`}
             borderWidth={1}
           >
             <YStack space="$4" alignItems="center">
+              {/* Progress Display */}
+              <YStack width="100%" space="$2" alignItems="center">
+                <Text
+                  fontSize="$3"
+                  color={`${getStatusColor()}11`}
+                  textAlign="center"
+                  fontWeight="600"
+                >
+                  Progress: {status.progress}%
+                </Text>
+                <XStack
+                  width="100%"
+                  height={4}
+                  backgroundColor={`${getStatusColor()}3`}
+                  borderRadius="$2"
+                >
+                  <YStack
+                    width={`${status.progress}%`}
+                    height="100%"
+                    backgroundColor={`${getStatusColor()}10`}
+                    borderRadius="$2"
+                  />
+                </XStack>
+              </YStack>
+
               {/* Status Icon */}
               <YStack alignItems="center" space="$2">
-                {provisioningState.isProvisioning ? (
-                  <Spinner size="large" color="$blue10" />
-                ) : provisioningState.isComplete ? (
-                  <Ionicons name="checkmark-circle" size={48} color="#22c55e" />
-                ) : provisioningState.error ? (
-                  <Ionicons name="close-circle" size={48} color="#ef4444" />
-                ) : (
-                  <Ionicons name="wifi" size={48} color="#3b82f6" />
-                )}
+                {getStatusIcon()}
 
                 <Text
                   fontSize="$5"
                   fontWeight="600"
                   textAlign="center"
-                  color={
-                    provisioningState.isComplete
-                      ? "$green11"
-                      : provisioningState.error
-                      ? "$red11"
-                      : "$blue11"
-                  }
+                  color={`${getStatusColor()}11`}
                 >
-                  {getProgressText()}
+                  {status.message}
                 </Text>
               </YStack>
 
-              {/* Progress Text */}
-              {provisioningState.progress && (
+              {/* Warning Message */}
+              {status.warning && (
                 <Text
                   fontSize="$3"
                   textAlign="center"
-                  color="$color11"
-                  opacity={0.8}
+                  color="$orange11"
+                  backgroundColor="$orange3"
+                  padding="$3"
+                  borderRadius="$2"
                 >
-                  {provisioningState.progress}
+                  ⚠️ {status.warning}
                 </Text>
               )}
 
               {/* Error Message */}
-              {provisioningState.error && (
+              {status.error && (
                 <YStack space="$3" alignItems="center">
                   <Text
                     fontSize="$3"
@@ -399,7 +483,7 @@ export const WiFiProvisioningScreen: React.FC = () => {
                     padding="$3"
                     borderRadius="$2"
                   >
-                    {provisioningState.error}
+                    {status.error}
                   </Text>
 
                   <Button
@@ -414,10 +498,10 @@ export const WiFiProvisioningScreen: React.FC = () => {
               )}
 
               {/* Success Actions */}
-              {provisioningState.isComplete && (
+              {status.isComplete && !status.isError && (
                 <Text fontSize="$3" textAlign="center" color="$green11">
                   Your device should now be connected to WiFi. Returning to
-                  device list...
+                  device list in 3 seconds...
                 </Text>
               )}
             </YStack>

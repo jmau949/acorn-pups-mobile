@@ -61,6 +61,10 @@ export const CameraScreen: React.FC = () => {
 
   const scanTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const deviceFoundRef = useRef(false);
+  const lastScanTimeRef = useRef<number>(0);
+
+  // QR scan throttling - minimum time between scans (milliseconds)
+  const QR_SCAN_THROTTLE_MS = 2000; // 2 seconds between scans
 
   useEffect(() => {
     if (!permission?.granted) {
@@ -129,6 +133,13 @@ export const CameraScreen: React.FC = () => {
   };
 
   const handleQRCodeScanned = async (result: BarcodeScanningResult) => {
+    const currentTime = Date.now();
+
+    // Check throttling - prevent rapid scans
+    if (currentTime - lastScanTimeRef.current < QR_SCAN_THROTTLE_MS) {
+      return; // Silently ignore rapid scans
+    }
+
     // Prevent multiple scans
     if (qrScanned || scanState.isScanning || scanState.isConnecting) {
       console.log("⏭️ [Camera] QR scan ignored - already processing:", {
@@ -138,6 +149,9 @@ export const CameraScreen: React.FC = () => {
       });
       return;
     }
+
+    // Update last scan time
+    lastScanTimeRef.current = currentTime;
 
     console.log("📷 [Camera] QR code scanned:", {
       data: result.data,
@@ -151,6 +165,10 @@ export const CameraScreen: React.FC = () => {
         ...prev,
         error: "Invalid QR code. Please scan a valid device QR code.",
       }));
+      // Allow retry after error
+      setTimeout(() => {
+        lastScanTimeRef.current = 0;
+      }, 1000);
       return;
     }
 
@@ -414,9 +432,10 @@ export const CameraScreen: React.FC = () => {
   };
 
   const handleRetry = () => {
-    console.log("🔄 [Camera] Retrying camera scan...");
+    console.log("🔄 [Camera] Retrying scan...");
     setQrScanned(false);
     deviceFoundRef.current = false;
+    lastScanTimeRef.current = 0; // Reset scan throttling
     setScanState({
       isScanning: false,
       isConnecting: false,
@@ -425,6 +444,7 @@ export const CameraScreen: React.FC = () => {
       targetDeviceName: null,
       foundDevice: null,
     });
+    bleService.stopScanning();
   };
 
   if (!permission) {
