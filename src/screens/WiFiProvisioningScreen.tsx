@@ -9,11 +9,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Button,
   Card,
-  Form,
-  H1,
-  Input,
-  Label,
-  Paragraph,
   ScrollView,
   Spinner,
   Text,
@@ -43,6 +38,20 @@ export const WiFiProvisioningScreen: React.FC = () => {
   // Safe parameter access
   const connectedDevice = route.params?.connectedDevice;
 
+  // Automatic WiFi credentials (you can customize these)
+  const automaticCredentials: WiFiCredentials = {
+    ssid: "x", // Your WiFi network name
+    password: "x", // Your WiFi password
+  };
+
+  const [provisioningState, setProvisioningState] =
+    useState<WiFiProvisioningState>({
+      isProvisioning: false,
+      isComplete: false,
+      error: null,
+      progress: null,
+    });
+
   // Early error check
   useEffect(() => {
     try {
@@ -68,6 +77,13 @@ export const WiFiProvisioningScreen: React.FC = () => {
       console.log(
         "🎯 [WiFiScreen] WiFi provisioning screen successfully mounted and ready"
       );
+
+      // Start automatic WiFi provisioning after a short delay
+      const provisionTimer = setTimeout(() => {
+        handleAutomaticProvision();
+      }, 1000);
+
+      return () => clearTimeout(provisionTimer);
     } catch (error) {
       console.error(
         "💥 [WiFiScreen] Error during screen initialization:",
@@ -131,21 +147,6 @@ export const WiFiProvisioningScreen: React.FC = () => {
     );
   }
 
-  const [credentials, setCredentials] = useState<WiFiCredentials>({
-    ssid: "",
-    password: "",
-  });
-
-  const [provisioningState, setProvisioningState] =
-    useState<WiFiProvisioningState>({
-      isProvisioning: false,
-      isComplete: false,
-      error: null,
-      progress: null,
-    });
-
-  const [showPassword, setShowPassword] = useState(false);
-
   const handleBack = () => {
     if (provisioningState.isProvisioning) {
       console.log("⚠️ [WiFiScreen] Cannot go back during provisioning");
@@ -167,166 +168,93 @@ export const WiFiProvisioningScreen: React.FC = () => {
     }
   };
 
-  const validateCredentials = (): boolean => {
-    if (!credentials.ssid.trim()) {
+  const handleAutomaticProvision = async () => {
+    if (!connectedDevice) {
       setProvisioningState((prev) => ({
         ...prev,
-        error: "Please enter a WiFi network name (SSID).",
+        error: "No device connected.",
       }));
-      return false;
-    }
-
-    if (credentials.ssid.trim().length > 32) {
-      setProvisioningState((prev) => ({
-        ...prev,
-        error: "WiFi network name must be 32 characters or less.",
-      }));
-      return false;
-    }
-
-    if (credentials.password.length > 63) {
-      setProvisioningState((prev) => ({
-        ...prev,
-        error: "WiFi password must be 63 characters or less.",
-      }));
-      return false;
-    }
-
-    return true;
-  };
-
-  const handleProvisionWiFi = async () => {
-    if (!validateCredentials()) {
       return;
     }
 
-    console.log("📡 [WiFiScreen] Starting WiFi provisioning...", {
-      ssid: credentials.ssid,
-      passwordLength: credentials.password.length,
-    });
-
-    setProvisioningState({
+    setProvisioningState((prev) => ({
+      ...prev,
       isProvisioning: true,
-      isComplete: false,
       error: null,
-      progress: "discovering",
-    });
+      progress: "Initializing WiFi provisioning...",
+    }));
 
     try {
-      // Step 1: Initialize WiFi provisioning service
-      setProvisioningState((prev) => ({ ...prev, progress: "discovering" }));
+      console.log(
+        "🚀 [WiFiScreen] Starting automatic WiFi provisioning with credentials:",
+        {
+          ssid: automaticCredentials.ssid,
+          passwordLength: automaticCredentials.password.length,
+        }
+      );
+
+      // Initialize WiFi provisioning service
+      setProvisioningState((prev) => ({
+        ...prev,
+        progress: "Connecting to device services...",
+      }));
+
       await wifiProvisioningService.initialize(connectedDevice.id);
 
-      // Step 2: Send WiFi credentials
-      setProvisioningState((prev) => ({ ...prev, progress: "writing" }));
-      await wifiProvisioningService.sendWiFiCredentials(credentials);
+      // Send WiFi credentials
+      setProvisioningState((prev) => ({
+        ...prev,
+        progress: "Sending WiFi credentials...",
+      }));
 
-      // Step 3: Verify (just a delay to show progress)
-      setProvisioningState((prev) => ({ ...prev, progress: "verifying" }));
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await wifiProvisioningService.sendWiFiCredentials(automaticCredentials);
 
-      // Success
-      console.log("🎉 [WiFiScreen] WiFi provisioning completed successfully");
-      setProvisioningState({
+      // Success!
+      setProvisioningState((prev) => ({
+        ...prev,
         isProvisioning: false,
         isComplete: true,
-        error: null,
-        progress: "complete",
-      });
+        progress: "WiFi credentials sent successfully!",
+      }));
 
-      // Auto-navigate after success
+      console.log(
+        "✅ [WiFiScreen] Automatic WiFi provisioning completed successfully"
+      );
+
+      // Auto-close after success
       setTimeout(() => {
-        console.log("🎉 [WiFiScreen] WiFi setup complete, closing modal");
-        const parentNav = navigation.getParent();
-        if (parentNav) {
-          parentNav.goBack();
-        } else {
-          navigation.goBack();
-        }
-      }, 3000);
+        handleSkip();
+      }, 2000);
     } catch (error) {
       console.error("💥 [WiFiScreen] WiFi provisioning failed:", error);
-
       const errorMessage =
-        error instanceof Error
-          ? wifiProvisioningService.getErrorMessage(error.message)
-          : "An unexpected error occurred.";
+        error instanceof Error ? error.message : "Unknown error occurred";
 
-      setProvisioningState({
+      setProvisioningState((prev) => ({
+        ...prev,
         isProvisioning: false,
-        isComplete: false,
-        error: errorMessage,
-        progress: null,
-      });
+        error: wifiProvisioningService.getErrorMessage(errorMessage),
+      }));
     }
+  };
+
+  const handleRetry = () => {
+    console.log("🔄 [WiFiScreen] Retrying WiFi provisioning");
+    handleAutomaticProvision();
   };
 
   const getProgressText = () => {
-    switch (provisioningState.progress) {
-      case "discovering":
-        return "Discovering WiFi services...";
-      case "writing":
-        return "Sending WiFi credentials...";
-      case "verifying":
-        return "Verifying connection...";
-      case "complete":
-        return "WiFi provisioning complete!";
-      default:
-        return "Preparing...";
+    if (provisioningState.isComplete) {
+      return "✅ WiFi Setup Complete!";
     }
+    if (provisioningState.error) {
+      return "❌ WiFi Setup Failed";
+    }
+    if (provisioningState.isProvisioning) {
+      return "📡 Setting up WiFi...";
+    }
+    return "🔄 Preparing WiFi Setup...";
   };
-
-  // Show success state
-  if (provisioningState.isComplete) {
-    return (
-      <YStack
-        flex={1}
-        backgroundColor="$background"
-        paddingTop={insets.top}
-        paddingBottom={insets.bottom}
-        justifyContent="center"
-        alignItems="center"
-        paddingHorizontal="$4"
-      >
-        <Card
-          backgroundColor="$background"
-          padding="$6"
-          borderRadius="$6"
-          alignItems="center"
-          space="$4"
-          minWidth={280}
-        >
-          <YStack
-            width={80}
-            height={80}
-            backgroundColor="$green10"
-            borderRadius="$4"
-            alignItems="center"
-            justifyContent="center"
-          >
-            <Ionicons name="wifi" size={40} color="white" />
-          </YStack>
-
-          <YStack alignItems="center" space="$2">
-            <Text
-              fontSize="$6"
-              fontWeight="600"
-              color="$green10"
-              textAlign="center"
-            >
-              WiFi Setup Complete!
-            </Text>
-            <Paragraph fontSize="$3" color="$color10" textAlign="center">
-              Your device is now connected to "{credentials.ssid}"
-            </Paragraph>
-            <Paragraph fontSize="$2" color="$color8" textAlign="center">
-              Returning to devices...
-            </Paragraph>
-          </YStack>
-        </Card>
-      </YStack>
-    );
-  }
 
   return (
     <YStack
@@ -338,202 +266,162 @@ export const WiFiProvisioningScreen: React.FC = () => {
       {/* Header */}
       <XStack
         alignItems="center"
+        justifyContent="space-between"
         paddingHorizontal="$4"
         paddingVertical="$3"
-        space="$3"
+        borderBottomWidth={1}
+        borderBottomColor="$borderColor"
       >
         <Button
-          size="$3"
-          circular
+          size="$4"
           variant="outlined"
           onPress={handleBack}
           disabled={provisioningState.isProvisioning}
-          icon={<Ionicons name="chevron-back" size={20} color="$color12" />}
-        />
-        <H1 flex={1} fontSize="$7" color="$color12">
+          icon={<Ionicons name="chevron-back" size={20} />}
+        >
+          Back
+        </Button>
+
+        <Text fontSize="$6" fontWeight="600">
           WiFi Setup
-        </H1>
+        </Text>
+
+        <Button
+          size="$4"
+          variant="outlined"
+          onPress={handleSkip}
+          disabled={provisioningState.isProvisioning}
+        >
+          Skip
+        </Button>
       </XStack>
 
-      <ScrollView flex={1} showsVerticalScrollIndicator={false}>
-        <YStack paddingHorizontal="$4" space="$6" paddingTop="$4">
-          {/* Device info */}
-          <Card
-            backgroundColor="$gray1"
-            borderColor="$gray5"
-            borderWidth={1}
-            borderRadius="$4"
-            padding="$4"
-          >
-            <XStack alignItems="center" space="$3">
-              <YStack
-                width={40}
-                height={40}
-                backgroundColor="$blue10"
-                borderRadius="$2"
-                alignItems="center"
-                justifyContent="center"
-              >
-                <Ionicons name="bluetooth" size={20} color="white" />
-              </YStack>
-              <YStack flex={1}>
-                <Text fontSize="$4" fontWeight="600" color="$color12">
-                  {connectedDevice.name}
-                </Text>
-                <Text fontSize="$2" color="$color10">
-                  Connected • Ready for WiFi setup
-                </Text>
-              </YStack>
-            </XStack>
+      {/* Content */}
+      <ScrollView flex={1} paddingHorizontal="$4" paddingTop="$4">
+        <YStack space="$4" alignItems="center">
+          {/* Device Info */}
+          <Card padding="$4" width="100%" borderRadius="$4">
+            <YStack space="$2" alignItems="center">
+              <Text fontSize="$4" fontWeight="600" color="$color12">
+                Connected Device
+              </Text>
+              <Text fontSize="$3" color="$color11">
+                {connectedDevice?.name || "Unknown Device"}
+              </Text>
+            </YStack>
           </Card>
 
-          {/* Instructions */}
-          <YStack space="$2">
-            <Text fontSize="$5" fontWeight="600" color="$color12">
-              Connect to WiFi
-            </Text>
-            <Paragraph fontSize="$3" color="$color10">
-              Enter your WiFi network credentials to connect your device to the
-              internet.
-            </Paragraph>
-          </YStack>
-
-          {/* WiFi Form */}
-          <Form onSubmit={handleProvisionWiFi}>
-            <YStack space="$4">
-              <YStack space="$2">
-                <Label fontSize="$3" color="$color11" fontWeight="500">
-                  WiFi Network Name (SSID)
-                </Label>
-                <Input
-                  size="$4"
-                  placeholder="Enter network name"
-                  value={credentials.ssid}
-                  onChangeText={(text) => {
-                    setCredentials((prev) => ({ ...prev, ssid: text }));
-                    setProvisioningState((prev) => ({ ...prev, error: null }));
-                  }}
-                  disabled={provisioningState.isProvisioning}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </YStack>
-
-              <YStack space="$2">
-                <Label fontSize="$3" color="$color11" fontWeight="500">
-                  WiFi Password
-                </Label>
-                <XStack space="$2">
-                  <Input
-                    flex={1}
-                    size="$4"
-                    placeholder="Enter password (optional)"
-                    value={credentials.password}
-                    onChangeText={(text) => {
-                      setCredentials((prev) => ({ ...prev, password: text }));
-                      setProvisioningState((prev) => ({
-                        ...prev,
-                        error: null,
-                      }));
-                    }}
-                    secureTextEntry={!showPassword}
-                    disabled={provisioningState.isProvisioning}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                  <Button
-                    size="$4"
-                    variant="outlined"
-                    onPress={() => setShowPassword(!showPassword)}
-                    disabled={provisioningState.isProvisioning}
-                    icon={
-                      <Ionicons
-                        name={showPassword ? "eye-off" : "eye"}
-                        size={16}
-                        color="$color10"
-                      />
-                    }
-                  />
-                </XStack>
-              </YStack>
+          {/* Automatic WiFi Info */}
+          <Card padding="$4" width="100%" borderRadius="$4">
+            <YStack space="$2" alignItems="center">
+              <Text fontSize="$4" fontWeight="600" color="$color12">
+                WiFi Network
+              </Text>
+              <Text fontSize="$3" color="$color11">
+                {automaticCredentials.ssid}
+              </Text>
+              <Text fontSize="$2" color="$color10">
+                Credentials will be sent automatically
+              </Text>
             </YStack>
-          </Form>
+          </Card>
 
-          {/* Error display */}
-          {provisioningState.error && (
-            <Card
-              backgroundColor="$red2"
-              borderColor="$red6"
-              borderWidth={1}
-              borderRadius="$4"
-              padding="$4"
-            >
-              <XStack alignItems="center" space="$3">
-                <YStack
-                  width={24}
-                  height={24}
-                  backgroundColor="$red10"
-                  borderRadius="$2"
-                  alignItems="center"
-                  justifyContent="center"
+          {/* Status Card */}
+          <Card
+            padding="$6"
+            width="100%"
+            borderRadius="$4"
+            backgroundColor={
+              provisioningState.isComplete
+                ? "$green2"
+                : provisioningState.error
+                ? "$red2"
+                : "$blue2"
+            }
+            borderColor={
+              provisioningState.isComplete
+                ? "$green6"
+                : provisioningState.error
+                ? "$red6"
+                : "$blue6"
+            }
+            borderWidth={1}
+          >
+            <YStack space="$4" alignItems="center">
+              {/* Status Icon */}
+              <YStack alignItems="center" space="$2">
+                {provisioningState.isProvisioning ? (
+                  <Spinner size="large" color="$blue10" />
+                ) : provisioningState.isComplete ? (
+                  <Ionicons name="checkmark-circle" size={48} color="#22c55e" />
+                ) : provisioningState.error ? (
+                  <Ionicons name="close-circle" size={48} color="#ef4444" />
+                ) : (
+                  <Ionicons name="wifi" size={48} color="#3b82f6" />
+                )}
+
+                <Text
+                  fontSize="$5"
+                  fontWeight="600"
+                  textAlign="center"
+                  color={
+                    provisioningState.isComplete
+                      ? "$green11"
+                      : provisioningState.error
+                      ? "$red11"
+                      : "$blue11"
+                  }
                 >
-                  <Ionicons name="alert" size={12} color="white" />
-                </YStack>
-                <Text fontSize="$3" color="$red11" flex={1}>
-                  {provisioningState.error}
-                </Text>
-              </XStack>
-            </Card>
-          )}
-
-          {/* Provisioning progress */}
-          {provisioningState.isProvisioning && (
-            <Card
-              backgroundColor="$blue2"
-              borderColor="$blue6"
-              borderWidth={1}
-              borderRadius="$4"
-              padding="$4"
-            >
-              <XStack alignItems="center" space="$3">
-                <Spinner size="small" color="$blue10" />
-                <Text fontSize="$3" color="$blue11" flex={1}>
                   {getProgressText()}
                 </Text>
-              </XStack>
-            </Card>
-          )}
+              </YStack>
 
-          {/* Action buttons */}
-          <YStack space="$3" paddingBottom="$6">
-            <Button
-              size="$4"
-              backgroundColor="$accentColor"
-              color="white"
-              onPress={handleProvisionWiFi}
-              disabled={
-                provisioningState.isProvisioning || !credentials.ssid.trim()
-              }
-            >
-              {provisioningState.isProvisioning ? (
-                <XStack alignItems="center" space="$2">
-                  <Spinner size="small" color="white" />
-                  <Text color="white">Setting up WiFi...</Text>
-                </XStack>
-              ) : (
-                "Connect to WiFi"
+              {/* Progress Text */}
+              {provisioningState.progress && (
+                <Text
+                  fontSize="$3"
+                  textAlign="center"
+                  color="$color11"
+                  opacity={0.8}
+                >
+                  {provisioningState.progress}
+                </Text>
               )}
-            </Button>
 
-            <Button
-              size="$4"
-              variant="outlined"
-              onPress={handleSkip}
-              disabled={provisioningState.isProvisioning}
-            >
-              Skip for now
-            </Button>
-          </YStack>
+              {/* Error Message */}
+              {provisioningState.error && (
+                <YStack space="$3" alignItems="center">
+                  <Text
+                    fontSize="$3"
+                    textAlign="center"
+                    color="$red11"
+                    backgroundColor="$red3"
+                    padding="$3"
+                    borderRadius="$2"
+                  >
+                    {provisioningState.error}
+                  </Text>
+
+                  <Button
+                    size="$4"
+                    backgroundColor="$red10"
+                    color="white"
+                    onPress={handleRetry}
+                  >
+                    Try Again
+                  </Button>
+                </YStack>
+              )}
+
+              {/* Success Actions */}
+              {provisioningState.isComplete && (
+                <Text fontSize="$3" textAlign="center" color="$green11">
+                  Your device should now be connected to WiFi. Returning to
+                  device list...
+                </Text>
+              )}
+            </YStack>
+          </Card>
         </YStack>
       </ScrollView>
     </YStack>

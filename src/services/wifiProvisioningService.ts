@@ -235,16 +235,19 @@ class WiFiProvisioningService {
         length: credentialsJson.length,
       });
 
-      // Try different encoding methods
+      // Try different encoding methods (React Native compatible)
       const encodingMethods = [
         {
           name: "base64",
-          data: Buffer.from(credentialsJson, "utf8").toString("base64"),
+          data: btoa(credentialsJson), // Use btoa() instead of Buffer for base64
         },
         { name: "utf8", data: credentialsJson },
         {
           name: "hex",
-          data: Buffer.from(credentialsJson, "utf8").toString("hex"),
+          data: credentialsJson
+            .split("")
+            .map((c) => c.charCodeAt(0).toString(16).padStart(2, "0"))
+            .join(""),
         },
       ];
 

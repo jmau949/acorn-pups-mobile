@@ -7,7 +7,7 @@ export interface WiFiProvisioningState {
   isProvisioning: boolean;
   isComplete: boolean;
   error: string | null;
-  progress: "discovering" | "writing" | "verifying" | "complete" | null;
+  progress: string | null;
 }
 
 export enum WiFiProvisioningError {
