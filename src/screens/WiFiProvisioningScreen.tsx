@@ -1,7 +1,8 @@
 import { wifiProvisioningService } from "@/services/wifiProvisioningService";
 import { DeviceSetupModalParamList } from "@/types/navigation";
-import { WiFiCredentials, WiFiProvisioningStatus } from "@/types/wifi";
+import { WiFiProvisioningStatus } from "@/types/wifi";
 import { Ionicons } from "@expo/vector-icons";
+import NetInfo from "@react-native-community/netinfo";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React, { useEffect, useRef, useState } from "react";
@@ -9,6 +10,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Button,
   Card,
+  H4,
+  Input,
   ScrollView,
   Spinner,
   Text,
@@ -26,6 +29,22 @@ type WiFiProvisioningRouteProp = RouteProp<
   "WiFiProvisioning"
 >;
 
+interface WiFiFormData {
+  ssid: string;
+  password: string;
+}
+
+interface WiFiFormErrors {
+  ssid?: string;
+  password?: string;
+  general?: string;
+}
+
+interface WiFiFormState {
+  isSubmitting: boolean;
+  errors: WiFiFormErrors;
+}
+
 export const WiFiProvisioningScreen: React.FC = () => {
   // Add error boundary for debugging
   const [hasError, setHasError] = useState(false);
@@ -38,11 +57,26 @@ export const WiFiProvisioningScreen: React.FC = () => {
   // Safe parameter access
   const connectedDevice = route.params?.connectedDevice;
 
+<<<<<<< Updated upstream
   // Automatic WiFi credentials (you can customize these)
   const automaticCredentials: WiFiCredentials = {
     ssid: "x", // Your WiFi network name
     password: "x", // Your WiFi password
   };
+=======
+  // WiFi form state
+  const [wifiFormData, setWifiFormData] = useState<WiFiFormData>({
+    ssid: "",
+    password: "",
+  });
+
+  const [wifiFormState, setWifiFormState] = useState<WiFiFormState>({
+    isSubmitting: false,
+    errors: {},
+  });
+
+  const [isDetectingWiFi, setIsDetectingWiFi] = useState(false);
+>>>>>>> Stashed changes
 
   // Use the new status system instead of the old state
   const [status, setStatus] = useState<WiFiProvisioningStatus>({
@@ -56,6 +90,69 @@ export const WiFiProvisioningScreen: React.FC = () => {
   // Ref to track current status for timeouts
   const statusRef = useRef(status);
   statusRef.current = status;
+
+  // WiFi form handlers
+  const updateWifiFormData = (field: keyof WiFiFormData, value: string) => {
+    setWifiFormData((prev) => ({ ...prev, [field]: value }));
+    // Clear error when user starts typing
+    if (wifiFormState.errors[field]) {
+      setWifiFormState((prev) => ({
+        ...prev,
+        errors: { ...prev.errors, [field]: undefined },
+      }));
+    }
+  };
+
+  const validateWifiForm = (): boolean => {
+    const newErrors: WiFiFormErrors = {};
+
+    if (!wifiFormData.ssid.trim()) {
+      newErrors.ssid = "WiFi network name (SSID) is required";
+    }
+
+    if (!wifiFormData.password.trim()) {
+      newErrors.password = "WiFi password is required";
+    } else if (wifiFormData.password.length < 8) {
+      newErrors.password = "WiFi password must be at least 8 characters";
+    }
+
+    setWifiFormState((prev) => ({ ...prev, errors: newErrors }));
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Detect current WiFi network
+  const detectCurrentWiFi = async () => {
+    try {
+      setIsDetectingWiFi(true);
+      console.log(
+        "🔍 [WiFiScreen] Attempting to detect current WiFi network..."
+      );
+
+      // Configure NetInfo to fetch WiFi SSID
+      NetInfo.configure({
+        shouldFetchWiFiSSID: true,
+      });
+
+      const netInfo = await NetInfo.fetch("wifi");
+
+      if (netInfo.type === "wifi" && netInfo.details?.ssid) {
+        console.log(
+          "✅ [WiFiScreen] Detected WiFi SSID:",
+          netInfo.details.ssid
+        );
+        setWifiFormData((prev) => ({
+          ...prev,
+          ssid: netInfo.details.ssid || "",
+        }));
+      } else {
+        console.log("⚠️ [WiFiScreen] Could not detect current WiFi network");
+      }
+    } catch (error) {
+      console.log("⚠️ [WiFiScreen] Error detecting WiFi:", error);
+    } finally {
+      setIsDetectingWiFi(false);
+    }
+  };
 
   // Early error check
   useEffect(() => {
@@ -83,13 +180,10 @@ export const WiFiProvisioningScreen: React.FC = () => {
         "🎯 [WiFiScreen] WiFi provisioning screen successfully mounted and ready"
       );
 
-      // Start automatic WiFi provisioning after a short delay
-      const provisionTimer = setTimeout(() => {
-        handleAutomaticProvision();
-      }, 1000);
+      // Try to detect current WiFi network
+      detectCurrentWiFi();
 
       return () => {
-        clearTimeout(provisionTimer);
         // Cleanup service when component unmounts
         wifiProvisioningService.cleanup();
       };
@@ -192,7 +286,9 @@ export const WiFiProvisioningScreen: React.FC = () => {
     }
   };
 
-  const handleAutomaticProvision = async () => {
+  const handleWiFiProvisioning = async () => {
+    if (!validateWifiForm()) return;
+
     if (!connectedDevice) {
       setStatus({
         phase: "error",
@@ -205,12 +301,14 @@ export const WiFiProvisioningScreen: React.FC = () => {
       return;
     }
 
+    setWifiFormState({ isSubmitting: true, errors: {} });
+
     try {
       console.log(
-        "🚀 [WiFiScreen] Starting automatic WiFi provisioning with credentials:",
+        "🚀 [WiFiScreen] Starting WiFi provisioning with user credentials:",
         {
-          ssid: automaticCredentials.ssid,
-          passwordLength: automaticCredentials.password.length,
+          ssid: wifiFormData.ssid,
+          passwordLength: wifiFormData.password.length,
         }
       );
 
@@ -249,7 +347,7 @@ export const WiFiProvisioningScreen: React.FC = () => {
       });
 
       console.log("📤 [WiFiScreen] Sending WiFi credentials...");
-      await wifiProvisioningService.sendWiFiCredentials(automaticCredentials);
+      await wifiProvisioningService.sendWiFiCredentials(wifiFormData);
 
       console.log(
         "✅ [WiFiScreen] WiFi credentials sent, waiting for device status updates..."
@@ -301,6 +399,8 @@ export const WiFiProvisioningScreen: React.FC = () => {
         isError: true,
         error: wifiProvisioningService.getErrorMessage(errorMessage),
       });
+    } finally {
+      setWifiFormState({ isSubmitting: false, errors: {} });
     }
   };
 
@@ -316,7 +416,7 @@ export const WiFiProvisioningScreen: React.FC = () => {
     });
 
     setTimeout(() => {
-      handleAutomaticProvision();
+      handleWiFiProvisioning();
     }, 500);
   };
 
@@ -338,6 +438,9 @@ export const WiFiProvisioningScreen: React.FC = () => {
     if (status.isError) return "$red";
     return "$blue";
   };
+
+  // Show WiFi setup form if not yet provisioning
+  const showForm = status.phase === "scanning" || status.isError;
 
   return (
     <YStack
@@ -394,118 +497,218 @@ export const WiFiProvisioningScreen: React.FC = () => {
             </YStack>
           </Card>
 
-          {/* Automatic WiFi Info */}
-          <Card padding="$4" width="100%" borderRadius="$4">
-            <YStack space="$2" alignItems="center">
-              <Text fontSize="$4" fontWeight="600" color="$color12">
-                WiFi Network
-              </Text>
-              <Text fontSize="$3" color="$color11">
-                {automaticCredentials.ssid}
-              </Text>
-              <Text fontSize="$2" color="$color10">
-                Credentials will be sent automatically
-              </Text>
-            </YStack>
-          </Card>
+          {/* WiFi Credentials Form */}
+          {showForm && (
+            <Card padding="$4" width="100%" borderRadius="$4">
+              <YStack space="$4">
+                <YStack space="$2" alignItems="center">
+                  <H4 color="$color12">WiFi Network Credentials</H4>
+                  <Text fontSize="$3" color="$color11" textAlign="center">
+                    Enter your WiFi network credentials to provision your device
+                  </Text>
+                </YStack>
+
+                {/* Auto-detect WiFi button */}
+                <Button
+                  size="$3"
+                  variant="outlined"
+                  onPress={detectCurrentWiFi}
+                  disabled={isDetectingWiFi}
+                  icon={
+                    isDetectingWiFi ? (
+                      <Spinner size="small" />
+                    ) : (
+                      <Ionicons name="search" size={16} />
+                    )
+                  }
+                >
+                  {isDetectingWiFi ? "Detecting..." : "Detect Current WiFi"}
+                </Button>
+
+                {/* WiFi SSID Field */}
+                <YStack space="$2">
+                  <Text fontSize="$3" color="$color11" fontWeight="500">
+                    Network Name (SSID) *
+                  </Text>
+                  <Input
+                    placeholder="Enter WiFi network name"
+                    value={wifiFormData.ssid}
+                    onChangeText={(text) => updateWifiFormData("ssid", text)}
+                    borderColor={
+                      wifiFormState.errors.ssid ? "$red7" : "$borderColor"
+                    }
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="next"
+                    disabled={wifiFormState.isSubmitting}
+                  />
+                  {wifiFormState.errors.ssid && (
+                    <Text color="$red11" fontSize="$2">
+                      {wifiFormState.errors.ssid}
+                    </Text>
+                  )}
+                </YStack>
+
+                {/* WiFi Password Field */}
+                <YStack space="$2">
+                  <Text fontSize="$3" color="$color11" fontWeight="500">
+                    Password *
+                  </Text>
+                  <Input
+                    placeholder="Enter WiFi password"
+                    value={wifiFormData.password}
+                    onChangeText={(text) =>
+                      updateWifiFormData("password", text)
+                    }
+                    borderColor={
+                      wifiFormState.errors.password ? "$red7" : "$borderColor"
+                    }
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                    onSubmitEditing={handleWiFiProvisioning}
+                    disabled={wifiFormState.isSubmitting}
+                  />
+                  {wifiFormState.errors.password && (
+                    <Text color="$red11" fontSize="$2">
+                      {wifiFormState.errors.password}
+                    </Text>
+                  )}
+                </YStack>
+
+                {/* General Error */}
+                {wifiFormState.errors.general && (
+                  <Text color="$red11" fontSize="$3" textAlign="center">
+                    {wifiFormState.errors.general}
+                  </Text>
+                )}
+
+                {/* Submit Button */}
+                <Button
+                  size="$4"
+                  backgroundColor="$blue10"
+                  color="white"
+                  onPress={handleWiFiProvisioning}
+                  disabled={wifiFormState.isSubmitting}
+                  opacity={wifiFormState.isSubmitting ? 0.6 : 1}
+                >
+                  {wifiFormState.isSubmitting
+                    ? "Connecting..."
+                    : "Connect to WiFi"}
+                </Button>
+              </YStack>
+            </Card>
+          )}
 
           {/* Status Card with Progress */}
-          <Card
-            padding="$6"
-            width="100%"
-            borderRadius="$4"
-            backgroundColor={`${getStatusColor()}2`}
-            borderColor={`${getStatusColor()}6`}
-            borderWidth={1}
-          >
-            <YStack space="$4" alignItems="center">
-              {/* Progress Display */}
-              <YStack width="100%" space="$2" alignItems="center">
-                <Text
-                  fontSize="$3"
-                  color={`${getStatusColor()}11`}
-                  textAlign="center"
-                  fontWeight="600"
-                >
-                  Progress: {status.progress}%
-                </Text>
-                <XStack
-                  width="100%"
-                  height={4}
-                  backgroundColor={`${getStatusColor()}3`}
-                  borderRadius="$2"
-                >
-                  <YStack
-                    width={`${status.progress}%`}
-                    height="100%"
-                    backgroundColor={`${getStatusColor()}10`}
+          {!showForm && (
+            <Card
+              padding="$6"
+              width="100%"
+              borderRadius="$4"
+              backgroundColor={`${getStatusColor()}2`}
+              borderColor={`${getStatusColor()}6`}
+              borderWidth={1}
+            >
+              <YStack space="$4" alignItems="center">
+                {/* Progress Display */}
+                <YStack width="100%" space="$2" alignItems="center">
+                  <Text
+                    fontSize="$3"
+                    color={`${getStatusColor()}11`}
+                    textAlign="center"
+                    fontWeight="600"
+                  >
+                    Progress: {status.progress}%
+                  </Text>
+                  <XStack
+                    width="100%"
+                    height={4}
+                    backgroundColor={`${getStatusColor()}3`}
                     borderRadius="$2"
-                  />
-                </XStack>
-              </YStack>
+                  >
+                    <YStack
+                      width={`${status.progress}%`}
+                      height="100%"
+                      backgroundColor={`${getStatusColor()}10`}
+                      borderRadius="$2"
+                    />
+                  </XStack>
+                </YStack>
 
-              {/* Status Icon */}
-              <YStack alignItems="center" space="$2">
-                {getStatusIcon()}
+                {/* Status Icon */}
+                <YStack alignItems="center" space="$2">
+                  {getStatusIcon()}
 
-                <Text
-                  fontSize="$5"
-                  fontWeight="600"
-                  textAlign="center"
-                  color={`${getStatusColor()}11`}
-                >
-                  {status.message}
-                </Text>
-              </YStack>
+                  <Text
+                    fontSize="$5"
+                    fontWeight="600"
+                    textAlign="center"
+                    color={`${getStatusColor()}11`}
+                  >
+                    {status.message}
+                  </Text>
+                </YStack>
 
-              {/* Warning Message */}
-              {status.warning && (
-                <Text
-                  fontSize="$3"
-                  textAlign="center"
-                  color="$orange11"
-                  backgroundColor="$orange3"
-                  padding="$3"
-                  borderRadius="$2"
-                >
-                  ⚠️ {status.warning}
-                </Text>
-              )}
+                {/* Network Info */}
+                {wifiFormData.ssid && (
+                  <YStack space="$2" alignItems="center">
+                    <Text fontSize="$3" color="$color11" fontWeight="500">
+                      Network: {wifiFormData.ssid}
+                    </Text>
+                  </YStack>
+                )}
 
-              {/* Error Message */}
-              {status.error && (
-                <YStack space="$3" alignItems="center">
+                {/* Warning Message */}
+                {status.warning && (
                   <Text
                     fontSize="$3"
                     textAlign="center"
-                    color="$red11"
-                    backgroundColor="$red3"
+                    color="$orange11"
+                    backgroundColor="$orange3"
                     padding="$3"
                     borderRadius="$2"
                   >
-                    {status.error}
+                    ⚠️ {status.warning}
                   </Text>
+                )}
 
-                  <Button
-                    size="$4"
-                    backgroundColor="$red10"
-                    color="white"
-                    onPress={handleRetry}
-                  >
-                    Try Again
-                  </Button>
-                </YStack>
-              )}
+                {/* Error Message */}
+                {status.error && (
+                  <YStack space="$3" alignItems="center">
+                    <Text
+                      fontSize="$3"
+                      textAlign="center"
+                      color="$red11"
+                      backgroundColor="$red3"
+                      padding="$3"
+                      borderRadius="$2"
+                    >
+                      {status.error}
+                    </Text>
 
-              {/* Success Actions */}
-              {status.isComplete && !status.isError && (
-                <Text fontSize="$3" textAlign="center" color="$green11">
-                  Your device should now be connected to WiFi. Returning to
-                  device list in 3 seconds...
-                </Text>
-              )}
-            </YStack>
-          </Card>
+                    <Button
+                      size="$4"
+                      backgroundColor="$red10"
+                      color="white"
+                      onPress={handleRetry}
+                    >
+                      Try Again
+                    </Button>
+                  </YStack>
+                )}
+
+                {/* Success Actions */}
+                {status.isComplete && !status.isError && (
+                  <Text fontSize="$3" textAlign="center" color="$green11">
+                    Your device should now be connected to WiFi. Returning to
+                    device list in 3 seconds...
+                  </Text>
+                )}
+              </YStack>
+            </Card>
+          )}
         </YStack>
       </ScrollView>
     </YStack>
