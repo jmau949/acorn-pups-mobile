@@ -57,13 +57,6 @@ export const WiFiProvisioningScreen: React.FC = () => {
   // Safe parameter access
   const connectedDevice = route.params?.connectedDevice;
 
-<<<<<<< Updated upstream
-  // Automatic WiFi credentials (you can customize these)
-  const automaticCredentials: WiFiCredentials = {
-    ssid: "x", // Your WiFi network name
-    password: "x", // Your WiFi password
-  };
-=======
   // WiFi form state
   const [wifiFormData, setWifiFormData] = useState<WiFiFormData>({
     ssid: "",
@@ -76,7 +69,6 @@ export const WiFiProvisioningScreen: React.FC = () => {
   });
 
   const [isDetectingWiFi, setIsDetectingWiFi] = useState(false);
->>>>>>> Stashed changes
 
   // Use the new status system instead of the old state
   const [status, setStatus] = useState<WiFiProvisioningStatus>({
