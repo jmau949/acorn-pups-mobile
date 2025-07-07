@@ -1,6 +1,6 @@
 import { bleService } from "@/services/bleService";
 import { BleDevice, BleError } from "@/types/ble";
-import { AppStackParamList } from "@/types/navigation";
+import { DeviceSetupModalParamList } from "@/types/navigation";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -20,7 +20,7 @@ import {
 } from "tamagui";
 
 type BluetoothSearchNavigationProp = NativeStackNavigationProp<
-  AppStackParamList,
+  DeviceSetupModalParamList,
   "BluetoothSearch"
 >;
 
@@ -225,7 +225,7 @@ export const BluetoothSearchScreen: React.FC = () => {
             "📡 [BluetoothSearch] Redirecting to WiFi provisioning..."
           );
           setTimeout(() => {
-            navigation.navigate("WiFiProvisioning", {
+            (navigation as any).navigate("WiFiProvisioning", {
               connectedDevice: device,
             });
           }, 1000);

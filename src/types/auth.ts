@@ -1,15 +1,16 @@
-export interface User {
-  id: string;
+/**
+ * Auth-specific User type (minimal info from Cognito)
+ */
+export interface AuthUser {
+  user_id: string;
   email: string;
-  name: string;
-  emailVerified: boolean;
-  phoneNumber?: string;
-  createdAt: string;
-  updatedAt: string;
+  cognito_sub: string;
+  email_verified: boolean;
+  full_name?: string;
 }
 
 export interface AuthState {
-  user: User | null;
+  user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   error: string | null;
@@ -23,8 +24,8 @@ export interface LoginCredentials {
 export interface SignUpCredentials {
   email: string;
   password: string;
-  name?: string;
-  phoneNumber?: string;
+  full_name?: string;
+  phone?: string;
 }
 
 export interface ResetPasswordData {

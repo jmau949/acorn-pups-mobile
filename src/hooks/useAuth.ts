@@ -1,9 +1,9 @@
 import { authService } from "@/services/auth";
-import { User } from "@/types/auth";
+import { AuthUser } from "@/types/auth";
 import { useCallback, useEffect, useState } from "react";
 
 interface AuthState {
-  user: User | null;
+  user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   error: string | null;
@@ -77,11 +77,11 @@ export const useAuth = () => {
    * Sign up user
    */
   const signUp = useCallback(
-    async (email: string, password: string, name?: string) => {
+    async (email: string, password: string, full_name?: string) => {
       try {
         setAuthState((prev) => ({ ...prev, error: null }));
 
-        await authService.signUp({ email, password, name });
+        await authService.signUp({ email, password, full_name });
 
         setAuthState((prev) => ({
           ...prev,
