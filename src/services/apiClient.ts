@@ -6,6 +6,7 @@
 
 import { ApiResponse } from "@/types/common";
 import { apiLogger } from "@/utils/logger";
+import ENV_CONFIG from "../../env";
 import { authService } from "./auth";
 
 export interface ApiClientConfig {
@@ -53,7 +54,7 @@ export class ApiClient {
 
   constructor(config: Partial<ApiClientConfig> = {}) {
     // Fail fast if API_BASE_URL is not configured
-    const apiBaseUrl = process.env.API_BASE_URL;
+    const apiBaseUrl = ENV_CONFIG.API_BASE_URL;
     if (!apiBaseUrl) {
       throw new Error(
         "API_BASE_URL environment variable is required but not set. " +

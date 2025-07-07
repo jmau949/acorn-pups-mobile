@@ -16,6 +16,20 @@ import {
 import { queryLogger } from "../utils/logger";
 
 /**
+ * Device Mutations with Optimized Cache Management
+ *
+ * Performance optimizations applied:
+ * 1. Use refetchQueries instead of invalidateQueries after optimistic updates
+ * 2. Only invalidate queries that are actually used in the UI
+ * 3. Commented out unused invitations invalidations to reduce network usage
+ *
+ * Current UI usage audit:
+ * - ✅ DEVICE_QUERY_KEYS.list(userId) - Used in DevicesScreen
+ * - ❌ invitations queries - Not used in UI yet
+ * - ❌ individual device queries - Not used in UI yet
+ */
+
+/**
  * Hook for updating device settings with optimistic updates
  */
 export function useUpdateDeviceSettings(userId: string) {
@@ -91,8 +105,11 @@ export function useUpdateDeviceSettings(userId: string) {
 
     // Always refetch after error or success to ensure consistency
     onSettled: () => {
-      queryClient.invalidateQueries({
+      // Use refetchQueries instead of invalidateQueries to prevent unnecessary refetches
+      // This will only refetch if the data is stale
+      queryClient.refetchQueries({
         queryKey: DEVICE_QUERY_KEYS.list(userId),
+        type: "active",
       });
     },
   });
@@ -165,8 +182,11 @@ export function useUpdateUserDevicePreferences(userId: string) {
     },
 
     onSettled: () => {
-      queryClient.invalidateQueries({
+      // Use refetchQueries instead of invalidateQueries to prevent unnecessary refetches
+      // This will only refetch if the data is stale
+      queryClient.refetchQueries({
         queryKey: DEVICE_QUERY_KEYS.list(userId),
+        type: "active",
       });
     },
   });
@@ -192,12 +212,13 @@ export function useSendDeviceInvitation() {
       return response.data;
     },
 
-    onSuccess: (data, variables) => {
-      // Invalidate device invitations list
-      queryClient.invalidateQueries({
-        queryKey: ["invitations", "device", variables.device_id],
-      });
-    },
+    // No onSuccess invalidation needed since invitations aren't used in UI yet
+    // onSuccess: (data, variables) => {
+    //   // Invalidate device invitations list
+    //   queryClient.invalidateQueries({
+    //     queryKey: ["invitations", "device", variables.device_id],
+    //   });
+    // },
 
     onError: (err, variables) => {
       queryLogger.fetchError(
@@ -236,10 +257,10 @@ export function useAcceptDeviceInvitation(userId: string) {
       queryClient.invalidateQueries({
         queryKey: DEVICE_QUERY_KEYS.list(userId),
       });
-      // Invalidate user's invitations list
-      queryClient.invalidateQueries({
-        queryKey: ["invitations", "user", userId],
-      });
+      // Note: Invitations queries removed since they're not used in UI yet
+      // queryClient.invalidateQueries({
+      //   queryKey: ["invitations", "user", userId],
+      // });
     },
 
     onError: (err, variables) => {
@@ -271,10 +292,10 @@ export function useDeclineDeviceInvitation(userId: string) {
     },
 
     onSuccess: () => {
-      // Invalidate user's invitations list
-      queryClient.invalidateQueries({
-        queryKey: ["invitations", "user", userId],
-      });
+      // Note: Invitations queries removed since they're not used in UI yet
+      // queryClient.invalidateQueries({
+      //   queryKey: ["invitations", "user", userId],
+      // });
     },
 
     onError: (err, variables) => {
@@ -343,9 +364,13 @@ export function useResetDevice(userId: string) {
     },
 
     onSuccess: () => {
-      // Invalidate all device-related queries since reset affects everything
-      queryClient.invalidateQueries({ queryKey: DEVICE_QUERY_KEYS.all });
-      queryClient.invalidateQueries({ queryKey: ["invitations"] });
+      // Only invalidate device list since that's what's used in UI
+      queryClient.invalidateQueries({
+        queryKey: DEVICE_QUERY_KEYS.list(userId),
+      });
+      // Note: Removed broad invalidations since invitations aren't used in UI yet
+      // queryClient.invalidateQueries({ queryKey: DEVICE_QUERY_KEYS.all });
+      // queryClient.invalidateQueries({ queryKey: ["invitations"] });
     },
 
     onError: (err, variables) => {
