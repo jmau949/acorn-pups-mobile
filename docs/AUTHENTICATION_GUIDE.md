@@ -235,38 +235,6 @@ Users experience:
 
 ---
 
-## System Refactoring
-
-### What Was Removed (Performance Optimization)
-
-#### ❌ Over-Engineered Components
-
-1. **Singleton Pattern** - Unnecessary class-based architecture
-2. **Timer System** - Background monitoring every 5 minutes
-3. **Manual JWT Parsing** - Token parsing and expiration checking
-4. **Complex Storage** - Multiple storage keys and operations
-5. **Background Processing** - Interval timers and monitoring
-
-#### 🗑️ Deleted Code (~250 lines removed)
-
-- `initializePersistentAuth()` - Complex initialization logic
-- `startTokenRefreshMonitoring()` - Background timer system
-- `checkAndRefreshTokens()` - Manual token management
-- `storeAuthData()` / `clearStoredData()` - Complex storage operations
-- Class-based singleton pattern
-
-### Performance Improvements
-
-| Aspect                 | Before            | After          | Improvement |
-| ---------------------- | ----------------- | -------------- | ----------- |
-| **Lines of Code**      | ~450 lines        | ~200 lines     | **-55%**    |
-| **Background Timers**  | 1 (every 5 min)   | 0              | **-100%**   |
-| **Storage Operations** | 6 keys            | 1 key          | **-83%**    |
-| **Token Parsing**      | Manual JWT decode | None           | **-100%**   |
-| **API Calls**          | Frequent checks   | On-demand only | **-90%**    |
-
-### Benefits
-
 #### 🔋 Battery Life
 
 - No background processing
