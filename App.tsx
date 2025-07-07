@@ -7,6 +7,7 @@ import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { configureAmplify } from "./src/config/aws-config";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { AuthProvider } from "./src/providers/AuthProvider";
+import { QueryProvider } from "./src/providers/QueryProvider";
 import tamaguiConfig from "./src/tamagui.config";
 
 // Configure AWS Amplify
@@ -17,11 +18,13 @@ export default function App() {
     <ErrorBoundary>
       <TamaguiProvider config={tamaguiConfig}>
         <SafeAreaProvider>
-          <AuthProvider>
-            <AppLifecycleManager>
-              <RootNavigator />
-            </AppLifecycleManager>
-          </AuthProvider>
+          <QueryProvider>
+            <AuthProvider>
+              <AppLifecycleManager>
+                <RootNavigator />
+              </AppLifecycleManager>
+            </AuthProvider>
+          </QueryProvider>
         </SafeAreaProvider>
       </TamaguiProvider>
     </ErrorBoundary>
