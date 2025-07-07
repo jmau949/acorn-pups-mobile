@@ -4,35 +4,15 @@
  * Custom hook for fetching and managing user devices using React Query
  */
 
-import { apiRequest } from "@/services/apiClient";
+import { useQuery, UseQueryResult } from "@tanstack/react-query";
+import { apiClient } from "../services/apiClient";
 import {
   Device,
   DEVICE_QUERY_KEYS,
   DeviceUser,
   GetUserDevicesResponse,
-} from "@/types/devices";
-import { queryLogger } from "@/utils/logger";
-import { useQuery, UseQueryResult } from "@tanstack/react-query";
-
-export interface UseUserDevicesOptions {
-  enabled?: boolean;
-  staleTime?: number;
-  gcTime?: number;
-  refetchOnWindowFocus?: boolean;
-}
-
-export interface UseUserDevicesResult {
-  devices: Device[];
-  isLoading: boolean;
-  isError: boolean;
-  error: Error | null;
-  isFetching: boolean;
-  isSuccess: boolean;
-  refetch: () => Promise<any>;
-  isRefetching: boolean;
-  dataUpdatedAt: number;
-  errorUpdatedAt: number;
-}
+} from "../types/devices";
+import { queryLogger } from "../utils/logger";
 
 /**
  * Hook for fetching user's devices
@@ -48,7 +28,7 @@ export function useUserDevices(
       const startTime = Date.now();
 
       try {
-        const response = await apiRequest.get<GetUserDevicesResponse>(
+        const response = await apiClient.get<GetUserDevicesResponse>(
           `/users/${userId}/devices`
         );
         const duration = Date.now() - startTime;
@@ -64,105 +44,6 @@ export function useUserDevices(
     enabled: !!userId, // Only run if userId is provided
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
-  });
-}
-
-/**
- * Hook for fetching user's devices with immediate cache loading
- */
-export function useUserDevicesImmediate(
-  userId: string
-): UseQueryResult<GetUserDevicesResponse, Error> {
-  return useQuery({
-    queryKey: DEVICE_QUERY_KEYS.list(userId),
-    queryFn: async () => {
-      const queryKey = DEVICE_QUERY_KEYS.list(userId);
-      queryLogger.fetchStart([...queryKey]);
-      const startTime = Date.now();
-
-      try {
-        const response = await apiRequest.get<GetUserDevicesResponse>(
-          `/users/${userId}/devices`
-        );
-        const duration = Date.now() - startTime;
-        queryLogger.fetchSuccess([...queryKey], duration);
-        return response.data;
-      } catch (error) {
-        queryLogger.fetchError([...queryKey], error as Error);
-        throw error;
-      }
-    },
-    staleTime: 0, // Always consider stale for immediate refetch
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    enabled: !!userId,
-    retry: 2,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
-  });
-}
-
-/**
- * Hook for fetching user's devices with longer cache time
- */
-export function useUserDevicesLongCache(
-  userId: string
-): UseQueryResult<GetUserDevicesResponse, Error> {
-  return useQuery({
-    queryKey: DEVICE_QUERY_KEYS.list(userId),
-    queryFn: async () => {
-      const queryKey = DEVICE_QUERY_KEYS.list(userId);
-      queryLogger.fetchStart([...queryKey]);
-      const startTime = Date.now();
-
-      try {
-        const response = await apiRequest.get<GetUserDevicesResponse>(
-          `/users/${userId}/devices`
-        );
-        const duration = Date.now() - startTime;
-        queryLogger.fetchSuccess([...queryKey], duration);
-        return response.data;
-      } catch (error) {
-        queryLogger.fetchError([...queryKey], error as Error);
-        throw error;
-      }
-    },
-    staleTime: 30 * 60 * 1000, // 30 minutes
-    gcTime: 60 * 60 * 1000, // 1 hour
-    enabled: !!userId,
-    retry: 2,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
-  });
-}
-
-/**
- * Hook for offline-first device fetching
- */
-export function useUserDevicesOffline(
-  userId: string
-): UseQueryResult<GetUserDevicesResponse, Error> {
-  return useQuery({
-    queryKey: DEVICE_QUERY_KEYS.list(userId),
-    queryFn: async () => {
-      const queryKey = DEVICE_QUERY_KEYS.list(userId);
-      queryLogger.fetchStart([...queryKey]);
-      const startTime = Date.now();
-
-      try {
-        const response = await apiRequest.get<GetUserDevicesResponse>(
-          `/users/${userId}/devices`
-        );
-        const duration = Date.now() - startTime;
-        queryLogger.fetchSuccess([...queryKey], duration);
-        return response.data;
-      } catch (error) {
-        queryLogger.fetchError([...queryKey], error as Error);
-        throw error;
-      }
-    },
-    staleTime: Infinity, // Never refetch automatically
-    gcTime: 24 * 60 * 60 * 1000, // 24 hours
-    enabled: !!userId,
-    retry: 1, // Only retry once for offline mode
-    retryDelay: 2000,
   });
 }
 

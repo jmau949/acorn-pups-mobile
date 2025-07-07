@@ -11,8 +11,6 @@ import { authService } from "./auth";
 export interface ApiClientConfig {
   baseUrl: string;
   timeout: number;
-  retryAttempts: number;
-  retryDelay: number;
 }
 
 export interface RequestConfig {
@@ -21,7 +19,6 @@ export interface RequestConfig {
   data?: any;
   headers?: Record<string, string>;
   skipAuth?: boolean;
-  retryAttempts?: number;
 }
 
 export class ApiError extends Error {
@@ -48,18 +45,25 @@ export class AuthError extends Error {
 /**
  * API Client Class
  *
- * Handles all HTTP requests with built-in retry logic, authentication,
- * and error handling
+ * Handles all HTTP requests with authentication and error handling.
+ * Retry logic is handled by React Query.
  */
 export class ApiClient {
   private config: ApiClientConfig;
 
   constructor(config: Partial<ApiClientConfig> = {}) {
+    // Fail fast if API_BASE_URL is not configured
+    const apiBaseUrl = process.env.API_BASE_URL;
+    if (!apiBaseUrl) {
+      throw new Error(
+        "API_BASE_URL environment variable is required but not set. " +
+          "Please configure your environment variables properly."
+      );
+    }
+
     this.config = {
-      baseUrl: process.env.API_BASE_URL || "https://api.acorn-pups.com",
+      baseUrl: apiBaseUrl,
       timeout: 10000,
-      retryAttempts: 2,
-      retryDelay: 1000,
       ...config,
     };
   }
@@ -94,27 +98,12 @@ export class ApiClient {
   }
 
   /**
-   * Sleep utility for retry delays
-   */
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  /**
-   * Make HTTP request with retry logic
+   * Make HTTP request (retry logic handled by React Query)
    */
   private async makeRequest<T = any>(
-    config: RequestConfig,
-    attempt: number = 1
+    config: RequestConfig
   ): Promise<ApiResponse<T>> {
-    const {
-      method,
-      url,
-      data,
-      headers = {},
-      skipAuth = false,
-      retryAttempts = this.config.retryAttempts,
-    } = config;
+    const { method, url, data, headers = {}, skipAuth = false } = config;
     const fullUrl = this.buildUrl(url);
     const startTime = Date.now();
 
@@ -195,14 +184,6 @@ export class ApiClient {
       ) {
         const networkError = new NetworkError("Network request failed");
         apiLogger.requestError(method, fullUrl, networkError, duration);
-
-        // Retry on network errors
-        if (attempt < retryAttempts) {
-          apiLogger.retryAttempt(method, fullUrl, attempt + 1, retryAttempts);
-          await this.sleep(this.config.retryDelay * attempt);
-          return this.makeRequest(config, attempt + 1);
-        }
-
         throw networkError;
       }
 
@@ -213,27 +194,10 @@ export class ApiClient {
       ) {
         const timeoutError = new NetworkError("Request timeout");
         apiLogger.requestError(method, fullUrl, timeoutError, duration);
-
-        // Retry on timeout
-        if (attempt < retryAttempts) {
-          apiLogger.retryAttempt(method, fullUrl, attempt + 1, retryAttempts);
-          await this.sleep(this.config.retryDelay * attempt);
-          return this.makeRequest(config, attempt + 1);
-        }
-
         throw timeoutError;
       }
 
-      // Handle server errors (5xx) with retry
-      if (error instanceof ApiError && error.status >= 500) {
-        if (attempt < retryAttempts) {
-          apiLogger.retryAttempt(method, fullUrl, attempt + 1, retryAttempts);
-          await this.sleep(this.config.retryDelay * attempt);
-          return this.makeRequest(config, attempt + 1);
-        }
-      }
-
-      // Re-throw other errors
+      // Re-throw all errors for React Query to handle retries
       throw error;
     }
   }

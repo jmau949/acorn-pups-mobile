@@ -6,6 +6,7 @@ export interface AuthUser {
   email: string;
   cognito_sub: string;
   email_verified: boolean;
+  full_name?: string;
 }
 
 export interface AuthState {

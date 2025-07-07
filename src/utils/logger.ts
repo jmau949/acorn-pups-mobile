@@ -14,7 +14,7 @@ export interface Logger {
 
 /**
  * Console Logger Implementation
- * Used for development and can be easily replaced with Sentry or other services
+ * Used for development
  */
 class ConsoleLogger implements Logger {
   private formatMessage(
@@ -54,6 +54,28 @@ class ConsoleLogger implements Logger {
 }
 
 /**
+ * Silent Logger Implementation
+ * Used for production when external logging service is not yet configured
+ */
+class SilentLogger implements Logger {
+  debug(): void {
+    // No-op in production
+  }
+
+  info(): void {
+    // No-op in production
+  }
+
+  warn(): void {
+    // No-op in production
+  }
+
+  error(): void {
+    // No-op in production - should be replaced with Sentry when ready
+  }
+}
+
+/**
  * Sentry Logger Implementation (Example)
  * Uncomment and configure when ready to use Sentry
  */
@@ -61,11 +83,10 @@ class ConsoleLogger implements Logger {
 //
 // class SentryLogger implements Logger {
 //   debug(message: string, extra?: Record<string, any>): void {
-//     Sentry.addBreadcrumb({
-//       message,
-//       level: 'debug',
-//       data: extra,
-//     });
+//     // Debug messages are typically not sent to Sentry to avoid noise
+//     if (__DEV__) {
+//       console.log(`[DEBUG] ${message}`, extra);
+//     }
 //   }
 //
 //   info(message: string, extra?: Record<string, any>): void {
@@ -86,7 +107,7 @@ class ConsoleLogger implements Logger {
 //   error(message: string, error?: Error, extra?: Record<string, any>): void {
 //     if (error) {
 //       Sentry.captureException(error, {
-//         tags: { source: 'api_client' },
+//         tags: { source: 'app' },
 //         extra: { message, ...extra }
 //       });
 //     } else {
@@ -101,11 +122,24 @@ class ConsoleLogger implements Logger {
 /**
  * Logger Configuration
  *
- * Switch between different logger implementations here
- * For production, uncomment the SentryLogger and replace ConsoleLogger
+ * Automatically switches between implementations based on environment:
+ * - Development: ConsoleLogger (verbose logging)
+ * - Production: SilentLogger (no console spam) or SentryLogger when configured
  */
-export const logger: Logger = new ConsoleLogger();
-// export const logger: Logger = new SentryLogger(); // For production
+function createLogger(): Logger {
+  // Check if we're in development mode
+  if (__DEV__ || process.env.NODE_ENV === "development") {
+    return new ConsoleLogger();
+  }
+
+  // For production, you can switch to SentryLogger when ready:
+  // return new SentryLogger();
+
+  // Until Sentry is configured, use SilentLogger to avoid console spam
+  return new SilentLogger();
+}
+
+export const logger: Logger = createLogger();
 
 /**
  * Specialized loggers for different modules
@@ -137,17 +171,6 @@ export const apiLogger = {
     logger.error(
       `API Error: ${method} ${url} - ${error.message} (${duration}ms)`,
       error
-    );
-  },
-
-  retryAttempt: (
-    method: string,
-    url: string,
-    attempt: number,
-    maxAttempts: number
-  ) => {
-    logger.warn(
-      `API Retry: ${method} ${url} - Attempt ${attempt}/${maxAttempts}`
     );
   },
 };

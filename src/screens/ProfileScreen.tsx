@@ -50,14 +50,14 @@ export const ProfileScreen: React.FC = () => {
               <Avatar.Image src="https://via.placeholder.com/120" />
               <Avatar.Fallback backgroundColor="$accentColor">
                 <Text color="white" fontSize="$8" fontWeight="600">
-                  {user?.name?.charAt(0) || user?.email?.charAt(0) || "U"}
+                  {user?.full_name?.charAt(0) || user?.email?.charAt(0) || "U"}
                 </Text>
               </Avatar.Fallback>
             </Avatar>
 
             <YStack alignItems="center" space="$2">
               <H1 textAlign="center" color="$color12">
-                {user?.name || "User"}
+                {user?.full_name || "User"}
               </H1>
               <Text color="$color10" textAlign="center" fontSize="$4">
                 {user?.email}
@@ -87,7 +87,7 @@ export const ProfileScreen: React.FC = () => {
                     Name
                   </Text>
                   <Text fontWeight="500" color="$color12">
-                    {user?.name || "Not provided"}
+                    {user?.full_name || "Not provided"}
                   </Text>
                 </XStack>
 

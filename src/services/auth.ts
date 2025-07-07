@@ -1,13 +1,13 @@
 import { configureAmplify } from "@/config/aws-config";
 import {
+  AuthUser,
   ConfirmResetPasswordData,
   LoginCredentials,
   ResetPasswordData,
   SignUpCredentials,
-  User,
 } from "@/types/auth";
 import {
-  AuthUser,
+  AuthUser as CognitoAuthUser,
   confirmResetPassword,
   confirmSignUp,
   fetchAuthSession,
@@ -29,17 +29,28 @@ configureAmplify();
  */
 export const authService = {
   /**
-   * Convert Cognito user to our User type
+   * Convert Cognito user to our AuthUser type
    */
-  cognitoUserToUser(cognitoUser: AuthUser): User {
+  async cognitoUserToAuthUser(cognitoUser: CognitoAuthUser): Promise<AuthUser> {
+    // Get additional user attributes from Cognito
+    let fullName: string | undefined;
+
+    try {
+      // Try to get user attributes to extract the name
+      const session = await fetchAuthSession();
+      const userAttributes = session.tokens?.idToken?.payload;
+      fullName = userAttributes?.name as string;
+    } catch (error) {
+      // If we can't get attributes, that's ok - name will be undefined
+      console.log("Could not fetch user attributes:", error);
+    }
+
     return {
-      id: cognitoUser.userId,
+      user_id: cognitoUser.userId,
       email: cognitoUser.signInDetails?.loginId || "",
-      name: cognitoUser.username || "",
-      emailVerified: true, // Cognito handles email verification
-      phoneNumber: "", // Can be extracted from attributes if needed
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      cognito_sub: cognitoUser.userId,
+      email_verified: true, // Cognito handles email verification
+      full_name: fullName,
     };
   },
 
@@ -58,10 +69,10 @@ export const authService = {
   /**
    * Get current user if authenticated
    */
-  async getCurrentUser(): Promise<User | null> {
+  async getCurrentUser(): Promise<AuthUser | null> {
     try {
       const cognitoUser = await getCurrentUser();
-      return this.cognitoUserToUser(cognitoUser);
+      return await this.cognitoUserToAuthUser(cognitoUser);
     } catch {
       return null;
     }
@@ -80,9 +91,9 @@ export const authService = {
         options: {
           userAttributes: {
             email: credentials.email,
-            ...(credentials.name && { name: credentials.name }),
-            ...(credentials.phoneNumber && {
-              phone_number: credentials.phoneNumber,
+            ...(credentials.full_name && { name: credentials.full_name }),
+            ...(credentials.phone && {
+              phone_number: credentials.phone,
             }),
           },
         },
@@ -130,7 +141,7 @@ export const authService = {
   /**
    * Sign in user
    */
-  async signIn(credentials: LoginCredentials): Promise<User> {
+  async signIn(credentials: LoginCredentials): Promise<AuthUser> {
     try {
       const result = await signIn({
         username: credentials.email,
@@ -155,7 +166,7 @@ export const authService = {
       }
 
       const cognitoUser = await getCurrentUser();
-      const user = this.cognitoUserToUser(cognitoUser);
+      const user = await this.cognitoUserToAuthUser(cognitoUser);
 
       return user;
     } catch (error) {
