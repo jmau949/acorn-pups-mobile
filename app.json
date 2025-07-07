@@ -18,15 +18,27 @@
         {
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan device QR codes."
         }
+      ],
+      [
+        "react-native-wifi-reborn",
+        {
+          "fineLocationPermission": false
+        }
       ]
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.acornpups.yourapp",
+      "bundleIdentifier": "com.acornpups.mobile.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "This app uses the camera to scan device QR codes for easy setup.",
-        "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to connect to your devices."
+        "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to connect to your devices.",
+        "NSLocalNetworkUsageDescription": "This app needs access to the local network to detect WiFi networks for device setup.",
+        "NSLocationWhenInUseUsageDescription": "This app needs location permission to detect WiFi network names for device setup."
+      },
+      "entitlements": {
+        "com.apple.developer.networking.wifi-info": true,
+        "com.apple.developer.networking.HotspotConfiguration": true
       }
     },
     "android": {
@@ -38,13 +50,11 @@
         "android.permission.CAMERA",
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
-        {
-          "name": "android.permission.BLUETOOTH_SCAN",
-          "usesPermissionFlags": "neverForLocation"
-        },
+        "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_CONNECT"
       ],
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.acornpups.mobile.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"

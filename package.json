@@ -23,7 +23,6 @@
     "@aws-amplify/react-native": "^1.1.10",
     "@expo/vector-icons": "^14.1.0",
     "@react-native-async-storage/async-storage": "^2.2.0",
-    "@react-native-community/netinfo": "^11.4.1",
     "@react-navigation/bottom-tabs": "^7.4.2",
     "@react-navigation/native": "^7.1.12",
     "@react-navigation/native-stack": "^7.3.17",
@@ -47,6 +46,7 @@
     "react-native-get-random-values": "^1.11.0",
     "react-native-safe-area-context": "^5.4.1",
     "react-native-screens": "^4.11.1",
+    "react-native-wifi-reborn": "^4.13.6",
     "tamagui": "^1.127.0"
   },
   "devDependencies": {

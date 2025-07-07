@@ -2,11 +2,12 @@ import { wifiProvisioningService } from "@/services/wifiProvisioningService";
 import { DeviceSetupModalParamList } from "@/types/navigation";
 import { WiFiProvisioningStatus } from "@/types/wifi";
 import { Ionicons } from "@expo/vector-icons";
-import NetInfo from "@react-native-community/netinfo";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React, { useEffect, useRef, useState } from "react";
+import { PermissionsAndroid, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import WifiManager from "react-native-wifi-reborn";
 import {
   Button,
   Card,
@@ -120,21 +121,35 @@ export const WiFiProvisioningScreen: React.FC = () => {
         "🔍 [WiFiScreen] Attempting to detect current WiFi network..."
       );
 
-      // Configure NetInfo to fetch WiFi SSID
-      NetInfo.configure({
-        shouldFetchWiFiSSID: true,
-      });
-
-      const netInfo = await NetInfo.fetch("wifi");
-
-      if (netInfo.type === "wifi" && netInfo.details?.ssid) {
-        console.log(
-          "✅ [WiFiScreen] Detected WiFi SSID:",
-          netInfo.details.ssid
+      // Request location permission for WiFi access
+      if (Platform.OS === "android") {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: "WiFi Network Detection",
+            message:
+              "This app needs location permission to detect the current WiFi network name for device setup.",
+            buttonNegative: "Cancel",
+            buttonPositive: "Allow",
+          }
         );
+
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          console.log(
+            "⚠️ [WiFiScreen] Location permission denied for WiFi detection"
+          );
+          return;
+        }
+      }
+
+      // Get current WiFi SSID using react-native-wifi-reborn
+      const currentSSID = await WifiManager.getCurrentWifiSSID();
+
+      if (currentSSID) {
+        console.log("✅ [WiFiScreen] Detected WiFi SSID:", currentSSID);
         setWifiFormData((prev) => ({
           ...prev,
-          ssid: netInfo.details.ssid || "",
+          ssid: currentSSID,
         }));
       } else {
         console.log("⚠️ [WiFiScreen] Could not detect current WiFi network");
