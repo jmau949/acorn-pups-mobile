@@ -19,18 +19,37 @@ import { queryLogger } from "../utils/logger";
  * Device Mutations with Optimized Cache Management
  *
  * Performance optimizations applied:
- * 1. Use refetchQueries instead of invalidateQueries after optimistic updates
- * 2. Only invalidate queries that are actually used in the UI
- * 3. Commented out unused invitations invalidations to reduce network usage
+ * 1. ✅ Use refetchQueries instead of invalidateQueries after optimistic updates
+ * 2. ✅ Only invalidate queries for fields actually displayed in DevicesScreen
+ * 3. ✅ Added defensive type checks for undefined query data
+ * 4. ✅ Match invalidation strategy to actual UI needs
+ * 5. ✅ Skip invalidations for user preferences (not displayed in list)
+ * 6. ✅ Use invalidateQueries only when adding/removing devices (can't optimize)
  *
  * Current UI usage audit:
  * - ✅ DEVICE_QUERY_KEYS.list(userId) - Used in DevicesScreen
- * - ❌ invitations queries - Not used in UI yet
+ * - ❌ invitations queries - Not used in UI yet (commented out)
  * - ❌ individual device queries - Not used in UI yet
+ *
+ * DevicesScreen displays these fields:
+ * - device_name, is_online, last_seen, signal_strength, wifi_ssid, firmware_version
+ *
+ * DevicesScreen does NOT display:
+ * - Device settings: sound_volume, led_brightness, quiet_hours_*
+ * - User preferences: device_nickname, notification_*, etc.
+ *
+ * Invalidation strategy:
+ * - Device settings: Only invalidate if device_name changes
+ * - User preferences: No invalidation needed (not displayed)
+ * - Add/remove device: Must invalidate (adds/removes list items)
+ * - Reset device: Must invalidate (affects displayed status fields)
  */
 
 /**
  * Hook for updating device settings with optimistic updates
+ *
+ * Performance optimization: Only invalidates list if device_name changes
+ * since other settings (volume, brightness, etc.) aren't shown in DevicesScreen
  */
 export function useUpdateDeviceSettings(userId: string) {
   const queryClient = useQueryClient();
@@ -63,6 +82,9 @@ export function useUpdateDeviceSettings(userId: string) {
       const previousDevices = queryClient.getQueryData<GetUserDevicesResponse>(
         DEVICE_QUERY_KEYS.list(userId)
       );
+
+      // Defensive check
+      if (!previousDevices) return { previousDevices: null };
 
       // Optimistically update the cache
       queryClient.setQueryData<GetUserDevicesResponse>(
@@ -103,20 +125,29 @@ export function useUpdateDeviceSettings(userId: string) {
       );
     },
 
-    // Always refetch after error or success to ensure consistency
-    onSettled: () => {
-      // Use refetchQueries instead of invalidateQueries to prevent unnecessary refetches
-      // This will only refetch if the data is stale
-      queryClient.refetchQueries({
-        queryKey: DEVICE_QUERY_KEYS.list(userId),
-        type: "active",
-      });
+    // Smart invalidation: only if device_name changed (affects list display)
+    onSettled: (data, error, variables) => {
+      const changesDisplayedFields =
+        variables.settings.device_name !== undefined;
+
+      if (changesDisplayedFields) {
+        // Use refetchQueries for displayed fields to prevent unnecessary refetches
+        queryClient.refetchQueries({
+          queryKey: DEVICE_QUERY_KEYS.list(userId),
+          type: "active",
+        });
+      }
+      // If only non-displayed fields changed (volume, brightness, etc.),
+      // no invalidation needed since DevicesScreen doesn't show these
     },
   });
 }
 
 /**
  * Hook for updating user's device preferences (nickname, notifications, etc.)
+ *
+ * Performance optimization: No list invalidation needed since user preferences
+ * (nickname, notifications, etc.) aren't displayed on DevicesScreen
  */
 export function useUpdateUserDevicePreferences(userId: string) {
   const queryClient = useQueryClient();
@@ -138,7 +169,7 @@ export function useUpdateUserDevicePreferences(userId: string) {
       return response.data;
     },
 
-    // Optimistic update
+    // Optimistic update for DeviceUser data
     onMutate: async ({ deviceId, preferences }) => {
       await queryClient.cancelQueries({
         queryKey: DEVICE_QUERY_KEYS.list(userId),
@@ -147,6 +178,9 @@ export function useUpdateUserDevicePreferences(userId: string) {
       const previousDevices = queryClient.getQueryData<GetUserDevicesResponse>(
         DEVICE_QUERY_KEYS.list(userId)
       );
+
+      // Defensive check
+      if (!previousDevices) return { previousDevices: null };
 
       // Optimistically update device_users
       queryClient.setQueryData<GetUserDevicesResponse>(
@@ -181,13 +215,12 @@ export function useUpdateUserDevicePreferences(userId: string) {
       );
     },
 
+    // No invalidation needed: user preferences aren't displayed on DevicesScreen
+    // The optimistic update above is sufficient for any future detail screens
     onSettled: () => {
-      // Use refetchQueries instead of invalidateQueries to prevent unnecessary refetches
-      // This will only refetch if the data is stale
-      queryClient.refetchQueries({
-        queryKey: DEVICE_QUERY_KEYS.list(userId),
-        type: "active",
-      });
+      // Previously: queryClient.refetchQueries({ queryKey: DEVICE_QUERY_KEYS.list(userId) });
+      // Optimization: User preferences (nickname, notifications) aren't shown in DevicesScreen
+      // so no refetch needed. The optimistic update handles the cache correctly.
     },
   });
 }
@@ -231,6 +264,9 @@ export function useSendDeviceInvitation() {
 
 /**
  * Hook for accepting device invitations
+ *
+ * Performance optimization: Uses invalidateQueries since this adds a new device
+ * to the user's list, which requires a fresh fetch
  */
 export function useAcceptDeviceInvitation(userId: string) {
   const queryClient = useQueryClient();
@@ -253,7 +289,7 @@ export function useAcceptDeviceInvitation(userId: string) {
     },
 
     onSuccess: () => {
-      // Invalidate user's devices list to show new device
+      // Invalidate (not refetch) since we're adding a new device that we don't have cached
       queryClient.invalidateQueries({
         queryKey: DEVICE_QUERY_KEYS.list(userId),
       });
@@ -274,6 +310,9 @@ export function useAcceptDeviceInvitation(userId: string) {
 
 /**
  * Hook for declining device invitations
+ *
+ * Performance optimization: No invalidation needed since declining doesn't
+ * affect the user's device list
  */
 export function useDeclineDeviceInvitation(userId: string) {
   const queryClient = useQueryClient();
@@ -292,6 +331,7 @@ export function useDeclineDeviceInvitation(userId: string) {
     },
 
     onSuccess: () => {
+      // No invalidation needed: declining doesn't affect user's device list
       // Note: Invitations queries removed since they're not used in UI yet
       // queryClient.invalidateQueries({
       //   queryKey: ["invitations", "user", userId],
@@ -309,6 +349,9 @@ export function useDeclineDeviceInvitation(userId: string) {
 
 /**
  * Hook for removing user access from a device
+ *
+ * Performance optimization: Uses invalidateQueries since this removes devices
+ * from user lists, requiring fresh fetches
  */
 export function useRemoveUserAccess(deviceOwnerId: string) {
   const queryClient = useQueryClient();
@@ -330,11 +373,11 @@ export function useRemoveUserAccess(deviceOwnerId: string) {
     },
 
     onSuccess: (data, variables) => {
-      // Invalidate device owner's devices list
+      // Invalidate device owner's devices list (device might be removed from their view)
       queryClient.invalidateQueries({
         queryKey: DEVICE_QUERY_KEYS.list(deviceOwnerId),
       });
-      // Invalidate removed user's devices list
+      // Invalidate removed user's devices list (device will be removed from their list)
       queryClient.invalidateQueries({
         queryKey: DEVICE_QUERY_KEYS.list(variables.userId),
       });
@@ -351,6 +394,9 @@ export function useRemoveUserAccess(deviceOwnerId: string) {
 
 /**
  * Hook for device factory reset
+ *
+ * Performance optimization: Uses invalidateQueries since reset can change
+ * device status, connectivity, and settings shown in DevicesScreen
  */
 export function useResetDevice(userId: string) {
   const queryClient = useQueryClient();
@@ -364,7 +410,7 @@ export function useResetDevice(userId: string) {
     },
 
     onSuccess: () => {
-      // Only invalidate device list since that's what's used in UI
+      // Invalidate device list since reset affects device status/connectivity shown in UI
       queryClient.invalidateQueries({
         queryKey: DEVICE_QUERY_KEYS.list(userId),
       });
