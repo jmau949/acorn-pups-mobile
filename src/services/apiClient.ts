@@ -185,8 +185,14 @@ export class ApiClient {
       // Log success
       apiLogger.requestSuccess(method, fullUrl, response.status, duration);
 
+      // Extract requestId from response or generate one
+      const requestId =
+        responseData.requestId ||
+        `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
       return {
-        data: responseData,
+        data: responseData.data || responseData, // Use responseData.data if available, otherwise use the whole response
+        requestId,
         success: true,
         message: responseData.message || "Request successful",
       };

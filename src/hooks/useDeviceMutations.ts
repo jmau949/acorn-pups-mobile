@@ -95,11 +95,11 @@ export function useUpdateDeviceSettings(userId: string) {
           return {
             ...old,
             devices: old.devices.map((device) =>
-              device.device_id === deviceId
+              device.deviceId === deviceId
                 ? {
                     ...device,
                     ...settings,
-                    updated_at: new Date().toISOString(),
+                    registeredAt: new Date().toISOString(),
                   }
                 : device
             ),
@@ -125,10 +125,9 @@ export function useUpdateDeviceSettings(userId: string) {
       );
     },
 
-    // Smart invalidation: only if device_name changed (affects list display)
+    // Smart invalidation: only if device settings changed (affects list display)
     onSettled: (data, error, variables) => {
-      const changesDisplayedFields =
-        variables.settings.device_name !== undefined;
+      const changesDisplayedFields = true; // Always invalidate for device settings changes
 
       if (changesDisplayedFields) {
         // Use refetchQueries for displayed fields to prevent unnecessary refetches

@@ -4,7 +4,7 @@ import { Device } from "@/types/devices";
 import { AppStackParamList } from "@/types/navigation";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import React from "react";
+import React, { useEffect } from "react";
 import { ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, Card, H1, H3, Spinner, Text, XStack, YStack } from "tamagui";
@@ -16,7 +16,7 @@ export const DevicesScreen: React.FC = () => {
   const navigation = useNavigation<DevicesScreenNavigationProp>();
   const { user } = useAuthContext();
 
-  // Use the custom hook to fetch devices
+  // Use the custom hook to fetch devices - now returns unwrapped data
   const {
     data: devicesData,
     isLoading,
@@ -27,14 +27,20 @@ export const DevicesScreen: React.FC = () => {
     isRefetching,
   } = useUserDevices(user?.user_id || "");
 
+  // Access unwrapped data directly
   const devices = devicesData?.devices || [];
-  const deviceUsers = devicesData?.device_users || [];
+  const totalCount = devicesData?.total || 0;
+
+  useEffect(() => {
+    console.log("devicesData :>> ", devicesData);
+    console.log("devices :>> ", devices);
+    console.log("totalCount :>> ", totalCount);
+  }, [devicesData, devices, totalCount]);
 
   // Process devices with new schema
   const sortedDevices = deviceUtils.sortDevicesByLastSeen(devices);
   const statusCounts = deviceUtils.getDeviceStatusCounts(devices);
   const onlineCount = statusCounts.online;
-  const totalCount = statusCounts.total;
 
   const handleAddDevice = () => {
     console.log("Add device button pressed");
@@ -50,34 +56,19 @@ export const DevicesScreen: React.FC = () => {
   };
 
   /**
-   * Get device status text
-   */
-  const getDeviceStatusText = (device: Device): string => {
-    if (!device.is_active) return "Inactive";
-    if (device.is_online) return "Online • Connected";
-    return "Offline";
-  };
-
-  /**
-   * Get user's nickname for device or default name
+   * Get device display name - use device name directly since custom nicknames
+   * would be part of the Device interface in the new schema
    */
   const getDeviceDisplayName = (device: Device): string => {
-    const deviceUser = deviceUsers.find(
-      (du) => du.device_id === device.device_id && du.user_id === user?.user_id
-    );
-    return deviceUser?.device_nickname || device.device_name;
+    return device.deviceName;
   };
 
   /**
    * Check if user can manage device settings
+   * Uses device permissions from the new schema
    */
   const canManageDevice = (device: Device): boolean => {
-    const deviceUser = deviceUsers.find(
-      (du) => du.device_id === device.device_id && du.user_id === user?.user_id
-    );
-    return (
-      deviceUser?.settings_permission || device.owner_user_id === user?.user_id
-    );
+    return device.permissions?.settings || device.ownerId === user?.user_id;
   };
 
   return (
@@ -177,7 +168,7 @@ export const DevicesScreen: React.FC = () => {
             <YStack space="$4">
               {sortedDevices.map((device) => (
                 <Card
-                  key={device.device_id}
+                  key={device.deviceId}
                   backgroundColor="$gray1"
                   borderColor="$gray5"
                   borderWidth={1}
@@ -187,7 +178,7 @@ export const DevicesScreen: React.FC = () => {
                   pressStyle={{ scale: 0.98 }}
                   onPress={() => {
                     // Navigate to device details (implement as needed)
-                    console.log("Device pressed:", device.device_id);
+                    console.log("Device pressed:", device.deviceId);
                   }}
                 >
                   <XStack justifyContent="space-between" alignItems="center">
@@ -199,7 +190,7 @@ export const DevicesScreen: React.FC = () => {
                         <Text fontSize="$6" fontWeight="600" color="$color12">
                           {getDeviceDisplayName(device)}
                         </Text>
-                        {device.owner_user_id === user?.user_id && (
+                        {device.ownerId === user?.user_id && (
                           <Text fontSize="$2" color="$color10" fontWeight="500">
                             OWNER
                           </Text>
@@ -210,26 +201,15 @@ export const DevicesScreen: React.FC = () => {
                         fontSize="$4"
                         fontWeight="500"
                       >
-                        {getDeviceStatusText(device)}
+                        {deviceUtils.getDeviceStatusText(device)}
                       </Text>
                       <Text color="$color10" fontSize="$3">
-                        Last seen:{" "}
-                        {deviceUtils.formatLastSeen(device.last_seen)}
+                        Last seen: {deviceUtils.formatLastSeen(device.lastSeen)}
                       </Text>
-                      <Text color="$color10" fontSize="$3">
-                        📶{" "}
-                        {deviceUtils.formatSignalStrength(
-                          device.signal_strength
-                        )}
-                      </Text>
-                      {device.wifi_ssid && (
+                      {/* Optional fields with proper null checking */}
+                      {device.firmwareVersion && (
                         <Text color="$color10" fontSize="$3">
-                          📡 {device.wifi_ssid}
-                        </Text>
-                      )}
-                      {device.firmware_version && (
-                        <Text color="$color10" fontSize="$3">
-                          🔧 v{device.firmware_version}
+                          🔧 v{device.firmwareVersion}
                         </Text>
                       )}
                     </YStack>
