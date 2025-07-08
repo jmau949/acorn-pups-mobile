@@ -99,7 +99,6 @@ export function useUpdateDeviceSettings(userId: string) {
                 ? {
                     ...device,
                     ...settings,
-                    registeredAt: new Date().toISOString(),
                   }
                 : device
             ),
