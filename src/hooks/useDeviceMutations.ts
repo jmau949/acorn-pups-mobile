@@ -4,8 +4,7 @@ import {
   Device,
   DEVICE_QUERY_KEYS,
   DeviceSettingsUpdate,
-  DeviceUser,
-  GetUserDevicesResponse,
+  UserDevicesData,
 } from "../types/devices";
 import {
   AcceptInvitationRequest as AcceptRequest,
@@ -16,14 +15,17 @@ import {
 import { queryLogger } from "../utils/logger";
 
 /**
- * Device Mutations with Optimized Cache Management
+ * Device Mutations with OpenAPI v1.0.0 Compliance
+ *
+ * This file contains mutations for device operations using only OpenAPI-compliant types.
+ * All legacy backward compatibility has been removed.
  *
  * Performance optimizations applied:
  * 1. ✅ Use refetchQueries instead of invalidateQueries after optimistic updates
  * 2. ✅ Only invalidate queries for fields actually displayed in DevicesScreen
  * 3. ✅ Added defensive type checks for undefined query data
  * 4. ✅ Match invalidation strategy to actual UI needs
- * 5. ✅ Skip invalidations for user preferences (not displayed in list)
+ * 5. ✅ Skip invalidations for settings not displayed in list
  * 6. ✅ Use invalidateQueries only when adding/removing devices (can't optimize)
  *
  * Current UI usage audit:
@@ -32,15 +34,13 @@ import { queryLogger } from "../utils/logger";
  * - ❌ individual device queries - Not used in UI yet
  *
  * DevicesScreen displays these fields:
- * - device_name, is_online, last_seen, signal_strength, wifi_ssid, firmware_version
+ * - deviceName, isOnline, lastSeen, firmwareVersion
  *
  * DevicesScreen does NOT display:
- * - Device settings: sound_volume, led_brightness, quiet_hours_*
- * - User preferences: device_nickname, notification_*, etc.
+ * - Device settings: soundEnabled, ledBrightness, quietHours, etc.
  *
  * Invalidation strategy:
- * - Device settings: Only invalidate if device_name changes
- * - User preferences: No invalidation needed (not displayed)
+ * - Device settings: Only invalidate if deviceName changes
  * - Add/remove device: Must invalidate (adds/removes list items)
  * - Reset device: Must invalidate (affects displayed status fields)
  */
@@ -79,7 +79,7 @@ export function useUpdateDeviceSettings(userId: string) {
       });
 
       // Snapshot the previous value
-      const previousDevices = queryClient.getQueryData<GetUserDevicesResponse>(
+      const previousDevices = queryClient.getQueryData<UserDevicesData>(
         DEVICE_QUERY_KEYS.list(userId)
       );
 
@@ -87,7 +87,7 @@ export function useUpdateDeviceSettings(userId: string) {
       if (!previousDevices) return { previousDevices: null };
 
       // Optimistically update the cache
-      queryClient.setQueryData<GetUserDevicesResponse>(
+      queryClient.setQueryData<UserDevicesData>(
         DEVICE_QUERY_KEYS.list(userId),
         (old) => {
           if (!old) return old;
@@ -125,7 +125,7 @@ export function useUpdateDeviceSettings(userId: string) {
       );
     },
 
-    // Smart invalidation: only if device settings changed (affects list display)
+    // Smart invalidation: always invalidate for device settings changes
     onSettled: (data, error, variables) => {
       const changesDisplayedFields = true; // Always invalidate for device settings changes
 
@@ -143,104 +143,25 @@ export function useUpdateDeviceSettings(userId: string) {
 }
 
 /**
- * Hook for updating user's device preferences (nickname, notifications, etc.)
- *
- * Performance optimization: No list invalidation needed since user preferences
- * (nickname, notifications, etc.) aren't displayed on DevicesScreen
- */
-export function useUpdateUserDevicePreferences(userId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({
-      deviceId,
-      preferences,
-    }: {
-      deviceId: string;
-      preferences: Partial<DeviceUser>;
-    }) => {
-      queryLogger.fetchStart(["device-user-preferences-update", deviceId]);
-      const response = await apiClient.put<DeviceUser>(
-        `/devices/${deviceId}/users/${userId}`,
-        preferences
-      );
-      queryLogger.fetchSuccess(["device-user-preferences-update", deviceId], 0);
-      return response.data;
-    },
-
-    // Optimistic update for DeviceUser data
-    onMutate: async ({ deviceId, preferences }) => {
-      await queryClient.cancelQueries({
-        queryKey: DEVICE_QUERY_KEYS.list(userId),
-      });
-
-      const previousDevices = queryClient.getQueryData<GetUserDevicesResponse>(
-        DEVICE_QUERY_KEYS.list(userId)
-      );
-
-      // Defensive check
-      if (!previousDevices) return { previousDevices: null };
-
-      // Optimistically update device_users
-      queryClient.setQueryData<GetUserDevicesResponse>(
-        DEVICE_QUERY_KEYS.list(userId),
-        (old) => {
-          if (!old) return old;
-
-          return {
-            ...old,
-            device_users: old.device_users.map((deviceUser) =>
-              deviceUser.device_id === deviceId && deviceUser.user_id === userId
-                ? { ...deviceUser, ...preferences }
-                : deviceUser
-            ),
-          };
-        }
-      );
-
-      return { previousDevices };
-    },
-
-    onError: (err, variables, context) => {
-      if (context?.previousDevices) {
-        queryClient.setQueryData(
-          DEVICE_QUERY_KEYS.list(userId),
-          context.previousDevices
-        );
-      }
-      queryLogger.fetchError(
-        ["device-user-preferences-update", variables.deviceId],
-        err as Error
-      );
-    },
-
-    // No invalidation needed: user preferences aren't displayed on DevicesScreen
-    // The optimistic update above is sufficient for any future detail screens
-    onSettled: () => {
-      // Previously: queryClient.refetchQueries({ queryKey: DEVICE_QUERY_KEYS.list(userId) });
-      // Optimization: User preferences (nickname, notifications) aren't shown in DevicesScreen
-      // so no refetch needed. The optimistic update handles the cache correctly.
-    },
-  });
-}
-
-/**
  * Hook for sending device invitations
  */
 export function useSendDeviceInvitation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (request: InvitationRequest) => {
-      queryLogger.fetchStart(["send-device-invitation", request.device_id]);
+    mutationFn: async ({
+      deviceId,
+      request,
+    }: {
+      deviceId: string;
+      request: InvitationRequest;
+    }) => {
+      queryLogger.fetchStart(["send-device-invitation", deviceId]);
       const response = await apiClient.post<InvitationResponse>(
-        `/devices/${request.device_id}/invite`,
+        `/devices/${deviceId}/invite`,
         request
       );
-      queryLogger.fetchSuccess(
-        ["send-device-invitation", request.device_id],
-        0
-      );
+      queryLogger.fetchSuccess(["send-device-invitation", deviceId], 0);
       return response.data;
     },
 
@@ -254,7 +175,7 @@ export function useSendDeviceInvitation() {
 
     onError: (err, variables) => {
       queryLogger.fetchError(
-        ["send-device-invitation", variables.device_id],
+        ["send-device-invitation", variables.deviceId],
         err as Error
       );
     },
@@ -274,14 +195,14 @@ export function useAcceptDeviceInvitation(userId: string) {
     mutationFn: async (request: AcceptRequest) => {
       queryLogger.fetchStart([
         "accept-device-invitation",
-        request.invitation_token,
+        request.invitationToken,
       ]);
       const response = await apiClient.post<AcceptResponse>(
-        `/invitations/${request.invitation_token}/accept`,
+        `/invitations/${request.invitationToken}/accept`,
         request
       );
       queryLogger.fetchSuccess(
-        ["accept-device-invitation", request.invitation_token],
+        ["accept-device-invitation", request.invitationToken],
         0
       );
       return response.data;
@@ -300,7 +221,7 @@ export function useAcceptDeviceInvitation(userId: string) {
 
     onError: (err, variables) => {
       queryLogger.fetchError(
-        ["accept-device-invitation", variables.invitation_token],
+        ["accept-device-invitation", variables.invitationToken],
         err as Error
       );
     },

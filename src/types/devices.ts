@@ -54,44 +54,6 @@ export interface DeviceSettings {
 }
 
 /**
- * Device User Relationship - matches DeviceUsers table schema
- */
-export interface DeviceUser {
-  device_id: string; // UUID of the device
-  user_id: string; // UUID of user with access
-
-  // Permissions
-  notifications_permission: boolean; // Can receive notifications
-  settings_permission: boolean; // Can modify device settings
-
-  // User preferences for this device
-  notifications_enabled: boolean; // User wants notifications from this device
-  notification_sound: NotificationSoundType; // Notification sound preference
-  notification_vibration: boolean; // Enable vibration for notifications
-
-  // User-specific quiet hours
-  quiet_hours_enabled: boolean; // User has quiet hours set
-  quiet_hours_start: string; // User's quiet hours start time "HH:MM"
-  quiet_hours_end: string; // User's quiet hours end time "HH:MM"
-
-  // Customization
-  custom_notification_sound?: string; // URL to custom sound file
-  device_nickname?: string; // User's custom name for device
-
-  // Invitation tracking
-  invited_by: string; // UUID of user who sent invitation
-  invited_at: string; // Invitation sent timestamp (ISO format)
-  accepted_at: string; // Invitation accepted timestamp (ISO format)
-  is_active: boolean; // Whether access permission is active
-}
-
-export enum NotificationSoundType {
-  DEFAULT = "default",
-  SILENT = "silent",
-  CUSTOM = "custom",
-}
-
-/**
  * Device Settings Update Request - matches OpenAPI DeviceSettingsRequest
  */
 export interface DeviceSettingsUpdate {
@@ -162,27 +124,6 @@ export interface DeviceResetData {
 
 // Full device reset API response
 export interface DeviceResetApiResponse extends ApiResponse<DeviceResetData> {}
-
-// Legacy types for backward compatibility
-export interface GetUserDevicesResponse {
-  devices: Device[];
-  device_users: DeviceUser[];
-  total_count: number;
-}
-
-export interface GetDeviceStatusResponse {
-  device: Device;
-  status: DeviceStatus[];
-  device_user: DeviceUser;
-}
-
-export interface RegisterDeviceResponse {
-  device: Device;
-  device_user: DeviceUser;
-  aws_iot_certificate: string;
-  aws_iot_private_key: string;
-  aws_iot_endpoint: string;
-}
 
 /**
  * Device Status - matches DeviceStatus table schema

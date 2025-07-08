@@ -63,13 +63,6 @@ export const deviceUtils = {
   },
 
   /**
-   * Filter devices by active status
-   */
-  filterActiveDevices: (devices: Device[]): Device[] => {
-    return devices.filter((device) => device.settings?.soundEnabled !== false);
-  },
-
-  /**
    * Sort devices by name
    */
   sortDevicesByName: (devices: Device[]): Device[] => {
@@ -95,16 +88,11 @@ export const deviceUtils = {
       total: devices.length,
       online: 0,
       offline: 0,
-      active: 0,
-      inactive: 0,
     };
 
     devices.forEach((device) => {
       if (device.isOnline) counts.online++;
       else counts.offline++;
-
-      if (device.settings?.soundEnabled !== false) counts.active++;
-      else counts.inactive++;
     });
 
     return counts;
