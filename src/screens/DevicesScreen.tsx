@@ -171,8 +171,11 @@ export const DevicesScreen: React.FC = () => {
                   elevate
                   pressStyle={{ scale: 0.98 }}
                   onPress={() => {
-                    // Navigate to device details (implement as needed)
-                    console.log("Device pressed:", device.deviceId);
+                    // Navigate to device details
+                    navigation.navigate("DeviceDetail", {
+                      deviceId: device.deviceId,
+                      deviceName: device.deviceName,
+                    });
                   }}
                 >
                   <XStack justifyContent="space-between" alignItems="center">
