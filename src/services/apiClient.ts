@@ -108,6 +108,10 @@ export class ApiClient {
     const fullUrl = this.buildUrl(url);
     const startTime = Date.now();
 
+    // Create AbortController for timeout handling
+    const abortController = new AbortController();
+    let timeoutId: NodeJS.Timeout | undefined;
+
     try {
       // Build headers
       const requestHeaders: Record<string, string> = {
@@ -124,11 +128,16 @@ export class ApiClient {
       // Log request start
       apiLogger.requestStart(method, fullUrl, requestHeaders);
 
+      // Set up timeout
+      timeoutId = setTimeout(() => {
+        abortController.abort();
+      }, this.config.timeout);
+
       // Create fetch options
       const fetchOptions: RequestInit = {
         method,
         headers: requestHeaders,
-        signal: AbortSignal.timeout(this.config.timeout),
+        signal: abortController.signal,
       };
 
       // Add body for non-GET requests
@@ -139,6 +148,12 @@ export class ApiClient {
       // Make the request
       const response = await fetch(fullUrl, fetchOptions);
       const duration = Date.now() - startTime;
+
+      // Clear timeout on successful response
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = undefined;
+      }
 
       // Handle response
       if (!response.ok) {
@@ -178,6 +193,22 @@ export class ApiClient {
     } catch (error: unknown) {
       const duration = Date.now() - startTime;
 
+      // Clean up timeout regardless of error type
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = undefined;
+      }
+
+      // Handle abort errors (includes timeout)
+      if (
+        (error as any)?.name === "AbortError" ||
+        abortController.signal.aborted
+      ) {
+        const timeoutError = new NetworkError("Request timeout");
+        apiLogger.requestError(method, fullUrl, timeoutError, duration);
+        throw timeoutError;
+      }
+
       // Handle network errors
       if (
         error instanceof TypeError ||
@@ -188,11 +219,8 @@ export class ApiClient {
         throw networkError;
       }
 
-      // Handle timeout errors
-      if (
-        (error as any)?.name === "TimeoutError" ||
-        (error as any)?.name === "AbortError"
-      ) {
+      // Handle other timeout-related errors (legacy fallback)
+      if ((error as any)?.name === "TimeoutError") {
         const timeoutError = new NetworkError("Request timeout");
         apiLogger.requestError(method, fullUrl, timeoutError, duration);
         throw timeoutError;
@@ -200,6 +228,11 @@ export class ApiClient {
 
       // Re-throw all errors for React Query to handle retries
       throw error;
+    } finally {
+      // Final cleanup to ensure timeout is always cleared
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     }
   }
 
