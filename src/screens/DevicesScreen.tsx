@@ -4,7 +4,7 @@ import { Device } from "@/types/devices";
 import { AppStackParamList } from "@/types/navigation";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import React, { useEffect } from "react";
+import React from "react";
 import { ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, Card, H1, H3, Spinner, Text, XStack, YStack } from "tamagui";
@@ -30,12 +30,6 @@ export const DevicesScreen: React.FC = () => {
   // Access unwrapped data directly
   const devices = devicesData?.devices || [];
   const totalCount = devicesData?.total || 0;
-
-  useEffect(() => {
-    console.log("devicesData :>> ", devicesData);
-    console.log("devices :>> ", devices);
-    console.log("totalCount :>> ", totalCount);
-  }, [devicesData, devices, totalCount]);
 
   // Process devices with new schema
   const sortedDevices = deviceUtils.sortDevicesByLastSeen(devices);
