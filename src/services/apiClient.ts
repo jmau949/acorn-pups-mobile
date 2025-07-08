@@ -47,6 +47,7 @@ export class AuthError extends Error {
  * API Client Class
  *
  * Handles all HTTP requests with authentication and error handling.
+ * Only accepts OpenAPI v1.0.0 compliant responses with 'data' and 'requestId' fields.
  * Retry logic is handled by React Query.
  */
 export class ApiClient {
@@ -185,8 +186,23 @@ export class ApiClient {
       // Log success
       apiLogger.requestSuccess(method, fullUrl, response.status, duration);
 
+      // Only accept OpenAPI v1.0.0 compliant responses
+      if (
+        !responseData ||
+        typeof responseData !== "object" ||
+        !("data" in responseData) ||
+        !("requestId" in responseData)
+      ) {
+        throw new ApiError(
+          "Server response is not OpenAPI v1.0.0 compliant. Expected response with 'data' and 'requestId' fields.",
+          response.status,
+          responseData
+        );
+      }
+
       return {
-        data: responseData,
+        data: responseData.data,
+        requestId: responseData.requestId,
         success: true,
         message: responseData.message || "Request successful",
       };
@@ -219,7 +235,7 @@ export class ApiClient {
         throw networkError;
       }
 
-      // Handle other timeout-related errors (legacy fallback)
+      // Handle other timeout-related errors
       if ((error as any)?.name === "TimeoutError") {
         const timeoutError = new NetworkError("Request timeout");
         apiLogger.requestError(method, fullUrl, timeoutError, duration);

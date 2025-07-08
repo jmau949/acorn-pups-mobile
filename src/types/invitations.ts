@@ -1,101 +1,95 @@
+import { ApiResponse } from "./common";
+
 /**
  * Invitation Types
  *
  * Type definitions for device invitations in the Acorn Pups system
- * Based on the Invitations table schema from technical documentation
+ * Based on OpenAPI v1.0.0 specification - all properties use camelCase
  */
 
 /**
- * Device Invitation - matches Invitations table schema
+ * Device Invitation - matches OpenAPI Invitation schema
  */
 export interface Invitation {
   // Primary identifiers
-  invitation_id: string; // Unique UUID for invitation
-  device_id: string; // UUID of device being shared
+  invitationId: string; // Unique UUID for invitation
+  deviceId: string; // UUID of device being shared
+  deviceName: string; // Device name for display
 
   // Invitation details
-  invited_email: string; // Email address of invited user
-  invited_by: string; // UUID of user sending invitation
-  invitation_token: string; // Unique token for accepting invitation
+  email: string; // Email address of invited user
+  invitedBy: string; // Name/email of user sending invitation
+  notificationsPermission: boolean; // Can receive notifications
+  settingsPermission: boolean; // Can modify device settings
 
   // Timestamps
-  expires_at: string; // Invitation expiration timestamp (ISO format)
-  created_at: string; // Invitation creation timestamp (ISO format)
-  accepted_at?: string; // Invitation acceptance timestamp (ISO format)
-
-  // Status
-  is_accepted: boolean; // Whether invitation has been accepted
-  is_expired: boolean; // Whether invitation has expired
+  createdAt: string; // Invitation creation timestamp (ISO format)
+  expiresAt: string; // Invitation expiration timestamp (ISO format)
 }
 
 /**
- * Send Invitation Request
+ * Send Invitation Request - matches OpenAPI UserInviteRequest
  */
 export interface SendInvitationRequest {
-  device_id: string;
-  invited_email: string;
-  notifications_permission?: boolean; // Default permissions for invited user
-  settings_permission?: boolean;
+  email: string;
+  notificationsPermission?: boolean; // Default permissions for invited user
+  settingsPermission?: boolean;
 }
 
 /**
  * Accept Invitation Request
  */
 export interface AcceptInvitationRequest {
-  invitation_token: string;
-  device_nickname?: string; // User's custom name for the device
-  notifications_enabled?: boolean; // User wants notifications from this device
-  notification_sound?: string; // Notification sound preference
-  notification_vibration?: boolean;
+  invitationToken: string;
 }
 
 /**
  * Decline Invitation Request
  */
 export interface DeclineInvitationRequest {
-  invitation_token: string;
+  invitationToken: string;
   reason?: string; // Optional reason for declining
 }
 
 /**
- * Invitation with Device Details (for display in UI)
+ * API Response types matching OpenAPI v1.0.0
  */
-export interface InvitationWithDevice {
-  invitation: Invitation;
-  device_name: string; // Device name for display
-  owner_name: string; // Name of user who sent invitation
-  owner_email: string; // Email of user who sent invitation
+
+// Send invitation response data
+export interface SendInvitationData {
+  invitationId: string;
+  email: string;
+  deviceId: string;
+  deviceName: string;
+  notificationsPermission: boolean;
+  settingsPermission: boolean;
+  expiresAt: string;
+  sentAt: string;
 }
 
-/**
- * API Response types
- */
-export interface SendInvitationResponse {
-  invitation: Invitation;
-  message: string;
-}
+// Full send invitation API response
+export interface SendInvitationResponse
+  extends ApiResponse<SendInvitationData> {}
 
-export interface GetUserInvitationsResponse {
-  invitations: InvitationWithDevice[];
-  total_count: number;
-}
-
-export interface GetDeviceInvitationsResponse {
+// User invitations response data
+export interface UserInvitationsData {
   invitations: Invitation[];
-  total_count: number;
+  total: number;
 }
 
-export interface AcceptInvitationResponse {
-  device_user: {
-    device_id: string;
-    user_id: string;
-    notifications_permission: boolean;
-    settings_permission: boolean;
-    notifications_enabled: boolean;
-    device_nickname?: string;
-  };
+// Full user invitations API response
+export interface UserInvitationsResponse
+  extends ApiResponse<UserInvitationsData> {}
+
+// Accept invitation response data
+export interface AcceptInvitationData {
+  deviceId: string;
   message: string;
 }
+
+// Full accept invitation API response
+export interface AcceptInvitationResponse
+  extends ApiResponse<AcceptInvitationData> {}
 
 /**
  * Query Keys - for React Query

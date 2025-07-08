@@ -2,25 +2,28 @@
  * useUserDevices Hook
  *
  * Custom hook for fetching and managing user devices using React Query
+ * Updated to match OpenAPI v1.0.0 specification with unwrapped responses
  */
 
-import { useQuery, UseQueryResult } from "@tanstack/react-query";
+import { ApiResponse } from "@/types/common";
+import { UseQueryResult } from "@tanstack/react-query";
 import { apiClient } from "../services/apiClient";
-import {
-  Device,
-  DEVICE_QUERY_KEYS,
-  DeviceUser,
-  GetUserDevicesResponse,
-} from "../types/devices";
+import { Device, DEVICE_QUERY_KEYS, UserDevicesData } from "../types/devices";
 import { queryLogger } from "../utils/logger";
+import { useUnwrappedQuery } from "./useUnwrappedQuery";
 
 /**
- * Hook for fetching user's devices
+ * Hook for fetching user's devices with unwrapped response
+ * Returns data directly without needing to access .data.data
  */
 export function useUserDevices(
   userId: string
-): UseQueryResult<GetUserDevicesResponse, Error> {
-  return useQuery({
+): UseQueryResult<UserDevicesData, Error> {
+  return useUnwrappedQuery<
+    ApiResponse<UserDevicesData>,
+    Error,
+    UserDevicesData
+  >({
     queryKey: DEVICE_QUERY_KEYS.list(userId),
     queryFn: async () => {
       const queryKey = DEVICE_QUERY_KEYS.list(userId);
@@ -28,12 +31,12 @@ export function useUserDevices(
       const startTime = Date.now();
 
       try {
-        const response = await apiClient.get<GetUserDevicesResponse>(
+        const response = await apiClient.get<UserDevicesData>(
           `/users/${userId}/devices`
         );
         const duration = Date.now() - startTime;
         queryLogger.fetchSuccess([...queryKey], duration);
-        return response.data;
+        return response;
       } catch (error) {
         queryLogger.fetchError([...queryKey], error as Error);
         throw error;
@@ -49,20 +52,14 @@ export function useUserDevices(
 
 /**
  * Device utility functions
+ * Updated to work with the new Device interface
  */
 export const deviceUtils = {
   /**
    * Filter devices by online status
    */
   filterOnlineDevices: (devices: Device[]): Device[] => {
-    return devices.filter((device) => device.is_online);
-  },
-
-  /**
-   * Filter devices by active status
-   */
-  filterActiveDevices: (devices: Device[]): Device[] => {
-    return devices.filter((device) => device.is_active);
+    return devices.filter((device) => device.isOnline);
   },
 
   /**
@@ -70,7 +67,7 @@ export const deviceUtils = {
    */
   sortDevicesByName: (devices: Device[]): Device[] => {
     return [...devices].sort((a, b) =>
-      a.device_name.localeCompare(b.device_name)
+      a.deviceName.localeCompare(b.deviceName)
     );
   },
 
@@ -79,8 +76,7 @@ export const deviceUtils = {
    */
   sortDevicesByLastSeen: (devices: Device[]): Device[] => {
     return [...devices].sort(
-      (a, b) =>
-        new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime()
+      (a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
     );
   },
 
@@ -92,47 +88,14 @@ export const deviceUtils = {
       total: devices.length,
       online: 0,
       offline: 0,
-      active: 0,
-      inactive: 0,
     };
 
     devices.forEach((device) => {
-      if (device.is_online) counts.online++;
+      if (device.isOnline) counts.online++;
       else counts.offline++;
-
-      if (device.is_active) counts.active++;
-      else counts.inactive++;
     });
 
     return counts;
-  },
-
-  /**
-   * Get user's permissions for a device
-   */
-  getUserDevicePermissions: (
-    deviceUsers: DeviceUser[],
-    deviceId: string,
-    userId: string
-  ) => {
-    const deviceUser = deviceUsers.find(
-      (du) => du.device_id === deviceId && du.user_id === userId
-    );
-    return deviceUser
-      ? {
-          notifications_permission: deviceUser.notifications_permission,
-          settings_permission: deviceUser.settings_permission,
-          notifications_enabled: deviceUser.notifications_enabled,
-          device_nickname: deviceUser.device_nickname,
-        }
-      : null;
-  },
-
-  /**
-   * Check if user owns a device
-   */
-  isDeviceOwner: (device: Device, userId: string): boolean => {
-    return device.owner_user_id === userId;
   },
 
   /**
@@ -154,7 +117,8 @@ export const deviceUtils = {
   /**
    * Format signal strength
    */
-  formatSignalStrength: (strength: number): string => {
+  formatSignalStrength: (strength?: number): string => {
+    if (!strength) return "Unknown";
     if (strength > -50) return "Excellent";
     if (strength > -60) return "Good";
     if (strength > -70) return "Fair";
@@ -165,8 +129,17 @@ export const deviceUtils = {
    * Get device status color
    */
   getDeviceStatusColor: (device: Device): string => {
-    if (!device.is_active) return "#666666"; // Gray for inactive
-    if (device.is_online) return "#22C55E"; // Green for online
+    if (device.settings?.soundEnabled === false) return "#666666"; // Gray for inactive
+    if (device.isOnline) return "#22C55E"; // Green for online
     return "#EF4444"; // Red for offline
+  },
+
+  /**
+   * Get device status text
+   */
+  getDeviceStatusText: (device: Device): string => {
+    if (device.settings?.soundEnabled === false) return "Inactive";
+    if (device.isOnline) return "Online • Connected";
+    return "Offline";
   },
 };
