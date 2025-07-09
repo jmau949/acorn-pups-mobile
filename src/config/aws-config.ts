@@ -13,9 +13,9 @@ const awsConfig = {
       },
       passwordFormat: {
         minLength: 8,
-        requireLowercase: false,
-        requireUppercase: false,
-        requireNumbers: false,
+        requireLowercase: true,
+        requireUppercase: true,
+        requireNumbers: true,
         requireSpecialCharacters: false,
       },
     },

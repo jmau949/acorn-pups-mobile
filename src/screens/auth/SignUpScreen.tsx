@@ -1,5 +1,9 @@
 import { useAuth } from "@/providers/AuthProvider";
 import type { AuthStackParamList } from "@/types/auth";
+import {
+  getPasswordRequirementsText,
+  validatePassword,
+} from "@/utils/passwordValidation";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useState } from "react";
 import { Platform, ScrollView } from "react-native";
@@ -76,8 +80,11 @@ export const SignUpScreen: React.FC<Props> = ({ navigation }) => {
 
     if (!formData.password) {
       newErrors.password = "Password is required";
-    } else if (formData.password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters";
+    } else {
+      const passwordValidation = validatePassword(formData.password);
+      if (!passwordValidation.isValid) {
+        newErrors.password = passwordValidation.errors[0]; // Show first error
+      }
     }
 
     if (!formData.confirmPassword) {
@@ -245,7 +252,7 @@ export const SignUpScreen: React.FC<Props> = ({ navigation }) => {
             {/* Password Field */}
             <YStack space="$2">
               <Input
-                placeholder="Password (8+ characters)"
+                placeholder={getPasswordRequirementsText()}
                 value={formData.password}
                 onChangeText={(text) => updateFormData("password", text)}
                 borderColor={

@@ -1,6 +1,7 @@
 import { BottomTabNavigator } from "@/navigation/BottomTabNavigator";
 import { BluetoothSearchScreen } from "@/screens/BluetoothSearchScreen";
 import { CameraScreen } from "@/screens/CameraScreen";
+import { DeviceDetailScreen } from "@/screens/DeviceDetailScreen";
 import { WiFiProvisioningScreen } from "@/screens/WiFiProvisioningScreen";
 import {
   AppStackParamList,
@@ -48,6 +49,13 @@ export const AppStack: React.FC = () => {
         component={DeviceSetupModalStack}
         options={{
           presentation: "fullScreenModal",
+        }}
+      />
+      <Stack.Screen
+        name="DeviceDetail"
+        component={DeviceDetailScreen}
+        options={{
+          presentation: "card",
         }}
       />
     </Stack.Navigator>

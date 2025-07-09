@@ -1,5 +1,9 @@
 import { useAuth } from "@/providers/AuthProvider";
 import type { AuthStackParamList } from "@/types/auth";
+import {
+  getPasswordRequirementsText,
+  validatePassword,
+} from "@/utils/passwordValidation";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useState } from "react";
 import { Platform, ScrollView } from "react-native";
@@ -67,8 +71,11 @@ export const ConfirmResetPasswordScreen: React.FC<Props> = ({
 
     if (!formData.newPassword) {
       newErrors.newPassword = "New password is required";
-    } else if (formData.newPassword.length < 8) {
-      newErrors.newPassword = "Password must be at least 8 characters";
+    } else {
+      const passwordValidation = validatePassword(formData.newPassword);
+      if (!passwordValidation.isValid) {
+        newErrors.newPassword = passwordValidation.errors[0]; // Show first error
+      }
     }
 
     if (!formData.confirmPassword) {
@@ -175,7 +182,7 @@ export const ConfirmResetPasswordScreen: React.FC<Props> = ({
             {/* New Password Field */}
             <YStack space="$2">
               <Input
-                placeholder="New password (8+ characters)"
+                placeholder={getPasswordRequirementsText()}
                 value={formData.newPassword}
                 onChangeText={(text) => updateFormData("newPassword", text)}
                 borderColor={

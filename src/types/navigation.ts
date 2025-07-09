@@ -13,6 +13,10 @@ export type BottomTabParamList = {
 export type AppStackParamList = {
   MainTabs: undefined;
   DeviceSetupModal: undefined;
+  DeviceDetail: {
+    deviceId: string;
+    deviceName: string;
+  };
 };
 
 export type DeviceSetupModalParamList = {

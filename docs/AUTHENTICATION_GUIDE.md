@@ -222,7 +222,7 @@ The app provides **seamless persistent authentication** where users remain logge
 
 - **Refresh Tokens**: Valid for 10 years (configurable in Cognito)
 - **Access Tokens**: Valid for 1 hour (automatically refreshed)
-- **Password Requirements**: 8 characters minimum only
+- **Password Requirements**: 8 characters minimum with uppercase, lowercase, and number
 
 ### User Experience
 
@@ -314,9 +314,9 @@ npm start
 
 ### Password Policy
 
-- **Requirement**: 8 characters minimum only
-- **No complexity requirements**: For better UX
-- **Configurable**: Can be changed in Cognito settings
+- **Requirements**: 8 characters minimum with uppercase, lowercase, and number
+- **Enforced**: Both client-side and server-side validation
+- **Configurable**: Can be changed in Cognito settings and client validation
 
 ### Token Security
 
