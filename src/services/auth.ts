@@ -300,7 +300,7 @@ export const authService = {
       UsernameExistsException:
         "An account with this email address already exists. Please sign in instead.",
       InvalidPasswordException:
-        "Password doesn't meet the requirements. Please use at least 8 characters with a mix of letters and numbers.",
+        "Password doesn't meet the requirements. Please use at least 8 characters with uppercase, lowercase, and number.",
       TooManyRequestsException:
         "Too many requests sent. Please wait a moment before trying again.",
       NetworkError:
