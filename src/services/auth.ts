@@ -319,4 +319,23 @@ export const authService = {
       "Something unexpected happened. Please try again or contact support if the problem continues.";
     return new Error(message);
   },
+
+  /**
+   * Get current user's access token for device provisioning
+   */
+  async getAccessToken(): Promise<string> {
+    try {
+      const session = await fetchAuthSession();
+      const accessToken = session.tokens?.accessToken?.toString();
+
+      if (!accessToken) {
+        throw new Error("No access token available");
+      }
+
+      return accessToken;
+    } catch (error) {
+      console.error("Failed to get access token:", error);
+      throw this.formatError(error);
+    }
+  },
 };

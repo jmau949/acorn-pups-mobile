@@ -311,37 +311,53 @@ class WiFiProvisioningService {
       throw new Error(WiFiProvisioningError.INVALID_CREDENTIALS);
     }
 
-    console.log("📤 [WiFi] Sending WiFi credentials...", {
+    if (!credentials.auth_token || credentials.auth_token.trim().length === 0) {
+      throw new Error(WiFiProvisioningError.INVALID_CREDENTIALS);
+    }
+
+    console.log("📤 [WiFi] Sending enhanced WiFi credentials...", {
       ssid: credentials.ssid,
       passwordLength: credentials.password.length,
+      deviceName: credentials.device_name,
+      timezone: credentials.user_timezone,
+      authTokenLength: credentials.auth_token.length,
       deviceId: this.device.id,
       characteristicUuid: this.ssidCharacteristic.uuid,
     });
 
     try {
-      // Prepare credentials JSON in the exact format requested
+      // Prepare enhanced credentials JSON with auth token and device metadata
       const credentialsJson = JSON.stringify({
         ssid: credentials.ssid,
         password: credentials.password,
+        auth_token: credentials.auth_token,
+        device_name: credentials.device_name,
+        user_timezone: credentials.user_timezone,
       });
 
-      console.log("📝 [WiFi] Credentials JSON prepared:", {
-        json: credentialsJson,
+      console.log("📝 [WiFi] Enhanced credentials JSON prepared:", {
+        json: credentialsJson.substring(0, 100) + "...", // Truncate for security
         length: credentialsJson.length,
+        includesAuthToken: credentialsJson.includes("auth_token"),
+        includesDeviceName: credentialsJson.includes("device_name"),
+        includesTimezone: credentialsJson.includes("user_timezone"),
       });
 
       // Convert to base64 for BLE transmission (React Native compatible)
       const base64Data = btoa(credentialsJson);
 
-      console.log("📤 [WiFi] Sending credentials to SSID characteristic...", {
-        dataLength: base64Data.length,
-        useResponse: this.ssidCharacteristic.isWritableWithResponse,
-      });
+      console.log(
+        "📤 [WiFi] Sending enhanced credentials to SSID characteristic...",
+        {
+          dataLength: base64Data.length,
+          useResponse: this.ssidCharacteristic.isWritableWithResponse,
+        }
+      );
 
       // Send credentials with write response
       await this.ssidCharacteristic.writeWithResponse(base64Data);
 
-      console.log("✅ [WiFi] WiFi credentials sent successfully!");
+      console.log("✅ [WiFi] Enhanced WiFi credentials sent successfully!");
 
       // Start timeout for status updates (30 seconds)
       this.startStatusTimeout();

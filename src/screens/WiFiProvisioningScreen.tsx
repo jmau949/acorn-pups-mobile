@@ -1,6 +1,8 @@
+import { authService } from "@/services/auth";
 import { wifiProvisioningService } from "@/services/wifiProvisioningService";
 import { DeviceSetupModalParamList } from "@/types/navigation";
 import { WiFiProvisioningStatus } from "@/types/wifi";
+import { getUserTimezone } from "@/utils/timezoneUtils";
 import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -33,11 +35,13 @@ type WiFiProvisioningRouteProp = RouteProp<
 interface WiFiFormData {
   ssid: string;
   password: string;
+  device_name: string;
 }
 
 interface WiFiFormErrors {
   ssid?: string;
   password?: string;
+  device_name?: string;
   general?: string;
 }
 
@@ -62,6 +66,7 @@ export const WiFiProvisioningScreen: React.FC = () => {
   const [wifiFormData, setWifiFormData] = useState<WiFiFormData>({
     ssid: "",
     password: "",
+    device_name: "",
   });
 
   const [wifiFormState, setWifiFormState] = useState<WiFiFormState>({
@@ -189,6 +194,12 @@ export const WiFiProvisioningScreen: React.FC = () => {
 
       // Try to detect current WiFi network
       detectCurrentWiFi();
+
+      // Initialize device name field with a default value based on the connected device
+      setWifiFormData((prev) => ({
+        ...prev,
+        device_name: connectedDevice.name || "Unknown Device",
+      }));
 
       return () => {
         // Cleanup service when component unmounts
@@ -354,10 +365,30 @@ export const WiFiProvisioningScreen: React.FC = () => {
       });
 
       console.log("📤 [WiFiScreen] Sending WiFi credentials...");
-      await wifiProvisioningService.sendWiFiCredentials(wifiFormData);
+
+      // Get authentication token and timezone
+      const authToken = await authService.getAccessToken();
+      const userTimezone = getUserTimezone();
+      const deviceName =
+        wifiFormData.device_name || connectedDevice.name || "Unknown Device";
+
+      console.log("🔐 [WiFiScreen] Preparing enhanced credentials:", {
+        ssid: wifiFormData.ssid,
+        deviceName,
+        timezone: userTimezone,
+        hasAuthToken: !!authToken,
+      });
+
+      await wifiProvisioningService.sendWiFiCredentials({
+        ssid: wifiFormData.ssid,
+        password: wifiFormData.password,
+        device_name: deviceName,
+        auth_token: authToken,
+        user_timezone: userTimezone,
+      });
 
       console.log(
-        "✅ [WiFiScreen] WiFi credentials sent, waiting for device status updates..."
+        "✅ [WiFiScreen] Enhanced WiFi credentials sent, waiting for device status updates..."
       );
 
       // Status updates will now be handled by the handleStatusUpdate callback
@@ -573,13 +604,41 @@ export const WiFiProvisioningScreen: React.FC = () => {
                     secureTextEntry
                     autoCapitalize="none"
                     autoCorrect={false}
-                    returnKeyType="done"
-                    onSubmitEditing={handleWiFiProvisioning}
+                    returnKeyType="next"
                     disabled={wifiFormState.isSubmitting}
                   />
                   {wifiFormState.errors.password && (
                     <Text color="$red11" fontSize="$2">
                       {wifiFormState.errors.password}
+                    </Text>
+                  )}
+                </YStack>
+
+                {/* Device Name Field */}
+                <YStack space="$2">
+                  <Text fontSize="$3" color="$color11" fontWeight="500">
+                    Device Name (Optional)
+                  </Text>
+                  <Input
+                    placeholder="Enter device name (e.g., My Smart Home)"
+                    value={wifiFormData.device_name}
+                    onChangeText={(text) =>
+                      updateWifiFormData("device_name", text)
+                    }
+                    borderColor={
+                      wifiFormState.errors.device_name
+                        ? "$red7"
+                        : "$borderColor"
+                    }
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                    onSubmitEditing={handleWiFiProvisioning}
+                    disabled={wifiFormState.isSubmitting}
+                  />
+                  {wifiFormState.errors.device_name && (
+                    <Text color="$red11" fontSize="$2">
+                      {wifiFormState.errors.device_name}
                     </Text>
                   )}
                 </YStack>

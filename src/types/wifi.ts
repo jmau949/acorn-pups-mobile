@@ -1,6 +1,9 @@
 export interface WiFiCredentials {
   ssid: string;
   password: string;
+  auth_token: string;
+  device_name: string;
+  user_timezone: string;
 }
 
 export interface WiFiProvisioningState {

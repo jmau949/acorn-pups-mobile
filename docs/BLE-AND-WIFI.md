@@ -1,17 +1,18 @@
 # BLE and WiFi Provisioning Guide
 
-This document explains how the Bluetooth Low Energy (BLE) and WiFi provisioning system works in the Acorn Pups mobile app. This system allows users to scan QR codes, connect to ESP32 devices via BLE, and provision WiFi credentials.
+This document explains how the Bluetooth Low Energy (BLE) and WiFi provisioning system works in the Acorn Pups mobile app. This system allows users to scan QR codes, connect to ESP32 devices via BLE, provision WiFi credentials, and automatically register devices with authentication.
 
 ## 🎯 Overview
 
-The app follows this flow:
+The app follows this enhanced flow:
 
 1. **QR Code Scanning** → Get device name from QR code
 2. **BLE Discovery** → Find the ESP32 device advertising over Bluetooth
 3. **BLE Connection** → Connect to the device
-4. **WiFi Provisioning** → Send WiFi credentials to device
+4. **Enhanced WiFi Provisioning** → Send WiFi credentials + authentication token + device metadata
 5. **Status Monitoring** → Track provisioning progress
-6. **Completion** → Device restarts and connects to WiFi
+6. **Device Registration** → ESP32 automatically registers with backend using provided auth token
+7. **Completion** → Device restarts and connects to WiFi
 
 ## 📱 User Experience Flow
 
@@ -138,7 +139,19 @@ const STATUS_CHAR_UUID = "12345678-1234-1234-1234-123456789abf";
 
 ### WiFi Credential Format
 
-#### JSON Structure
+#### Enhanced JSON Structure (v2.0)
+
+```json
+{
+  "ssid": "your-wifi-name",
+  "password": "your-wifi-password",
+  "auth_token": "eyJraWQiOiI0eEdGUjRMaH...",
+  "device_name": "Living Room Receiver",
+  "user_timezone": "America/Los_Angeles"
+}
+```
+
+#### Legacy JSON Structure (v1.0 - Deprecated)
 
 ```json
 {
@@ -149,10 +162,24 @@ const STATUS_CHAR_UUID = "12345678-1234-1234-1234-123456789abf";
 
 #### Transmission Protocol
 
-1. **JSON** → Convert credentials to JSON string
+1. **JSON** → Convert enhanced credentials to JSON string with auth token and metadata
 2. **Base64** → Encode for BLE transmission (React Native compatible)
 3. **BLE Write** → Send to SSID characteristic with response
 4. **Confirmation** → Wait for status updates
+
+#### Enhanced Data Fields
+
+- **`ssid`**: WiFi network name (required)
+- **`password`**: WiFi network password (required)
+- **`auth_token`**: JWT authentication token from the authenticated user (required)
+  - Used by ESP32 for automatic device registration with backend
+  - Ensures only authenticated users can provision devices
+- **`device_name`**: User-friendly device name (required)
+  - Allows users to customize device names during setup
+  - Defaults to the BLE advertised name if not specified
+- **`user_timezone`**: User's timezone in IANA format (required)
+  - Automatically detected from user's device/browser
+  - Used for proper timestamp handling and scheduling features
 
 ### Status Updates from ESP32
 
@@ -343,10 +370,20 @@ interface WiFiState {
 3. **Device discovered**: "AcornPups-B901" found with good signal
 4. **Auto-connection**: App connects to exact matching device
 5. **Service discovery**: Find WiFi provisioning service
-6. **Credential transmission**: Send `{"ssid": "x", "password": "x"}`
+6. **Enhanced credential transmission**: Send:
+   ```json
+   {
+     "ssid": "MyHomeWiFi",
+     "password": "secretpassword123",
+     "auth_token": "eyJraWQiOiI0eEdGUjRMaH...",
+     "device_name": "Living Room Receiver",
+     "user_timezone": "America/Los_Angeles"
+   }
+   ```
 7. **Status monitoring**: Receive RECEIVED → PROCESSING → STORED → SUCCESS
 8. **Device restart**: ESP32 disconnects and reboots to WiFi mode
-9. **Completion**: User sees success message and modal closes
+9. **Device registration**: ESP32 automatically registers with backend using provided auth token
+10. **Completion**: User sees success message and modal closes
 
 ## 📝 Logging & Debugging
 
