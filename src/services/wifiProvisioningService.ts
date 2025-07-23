@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import {
   Characteristic,
   Device,
@@ -20,6 +21,12 @@ const STATUS_CHAR_UUID = "12345678-1234-1234-1234-123456789abf";
 // Status timeout (matches ESP32 30-second timeout)
 const STATUS_TIMEOUT_MS = 30000;
 
+// BLE MTU configuration
+const DEFAULT_MTU = 23; // Standard BLE MTU
+const TARGET_MTU = 512; // Target for maximum throughput
+const MIN_CHUNK_SIZE = 20; // Minimum safe chunk size (DEFAULT_MTU - 3)
+const CHUNK_DELAY_MS = 15; // Delay between chunk writes to avoid overrun
+
 class WiFiProvisioningService {
   private device: Device | null = null;
   private service: Service | null = null;
@@ -29,6 +36,7 @@ class WiFiProvisioningService {
   private statusCallback: ((status: WiFiProvisioningStatus) => void) | null =
     null;
   private statusTimeout: NodeJS.Timeout | null = null;
+  private negotiatedMTU: number = DEFAULT_MTU;
 
   /**
    * Initialize WiFi provisioning with a connected BLE device
@@ -47,6 +55,9 @@ class WiFiProvisioningService {
     this.device = device;
 
     try {
+      // Negotiate MTU first for better performance
+      await this.negotiateMTU(device);
+
       // Discover services
       console.log("🔍 [WiFi] Discovering BLE services...");
       await device.discoverAllServicesAndCharacteristics();
@@ -119,6 +130,46 @@ class WiFiProvisioningService {
     } catch (error) {
       console.error("💥 [WiFi] Failed to initialize WiFi provisioning:", error);
       throw error;
+    }
+  }
+
+  /**
+   * Negotiate MTU for optimal data transfer
+   */
+  private async negotiateMTU(device: Device): Promise<void> {
+    try {
+      console.log("🔧 [WiFi] Negotiating MTU for optimal data transfer...");
+
+      // On Android, explicitly request MTU
+      if (Platform.OS === "android") {
+        console.log(
+          `🔧 [WiFi] Requesting MTU of ${TARGET_MTU} bytes (Android)...`
+        );
+        try {
+          const mtuResult = await device.requestMTU(TARGET_MTU);
+          // Some versions return the device, others return the MTU directly
+          this.negotiatedMTU =
+            typeof mtuResult === "number" ? mtuResult : TARGET_MTU;
+          console.log(`✅ [WiFi] MTU negotiated: ${this.negotiatedMTU} bytes`);
+        } catch (mtuError) {
+          console.warn(
+            "⚠️ [WiFi] MTU request failed, using fallback:",
+            mtuError
+          );
+          this.negotiatedMTU = Math.min(TARGET_MTU, 247); // Common Android fallback
+        }
+      } else {
+        // iOS handles MTU automatically, but we can check current MTU
+        console.log("🔧 [WiFi] iOS detected - MTU will be auto-negotiated");
+        // iOS typically negotiates 185 bytes automatically
+        this.negotiatedMTU = 185; // Conservative estimate for iOS
+        console.log(
+          `✅ [WiFi] Using estimated MTU: ${this.negotiatedMTU} bytes`
+        );
+      }
+    } catch (error) {
+      console.warn("⚠️ [WiFi] MTU negotiation failed, using default:", error);
+      this.negotiatedMTU = DEFAULT_MTU;
     }
   }
 
@@ -300,7 +351,92 @@ class WiFiProvisioningService {
   }
 
   /**
-   * Send WiFi credentials to the connected device
+   * Calculate chunk size based on negotiated MTU
+   */
+  private getChunkSize(): number {
+    // Reserve 3 bytes for BLE header/overhead
+    const chunkSize = this.negotiatedMTU - 3;
+
+    // Ensure minimum chunk size for safety
+    return Math.max(chunkSize, MIN_CHUNK_SIZE);
+  }
+
+  /**
+   * Split data into chunks for BLE transmission
+   */
+  private chunkData(data: string): string[] {
+    const chunkSize = this.getChunkSize();
+    const chunks: string[] = [];
+
+    for (let i = 0; i < data.length; i += chunkSize) {
+      chunks.push(data.slice(i, i + chunkSize));
+    }
+
+    console.log("✂️ [WiFi] Data chunked for transmission:", {
+      originalLength: data.length,
+      chunkSize,
+      numChunks: chunks.length,
+      mtu: this.negotiatedMTU,
+    });
+
+    return chunks;
+  }
+
+  /**
+   * Send data chunks with proper timing and protocol
+   */
+  private async sendChunkedData(data: string): Promise<void> {
+    if (!this.ssidCharacteristic) {
+      throw new Error("SSID characteristic not available");
+    }
+
+    // Create length-prefixed protocol: [8-digit length][raw JSON data]
+    const lengthPrefix = data.length.toString().padStart(8, "0");
+    const fullData = lengthPrefix + data;
+
+    // Convert the full data to base64 for BLE transmission
+    const base64Data = btoa(fullData);
+
+    console.log("📦 [WiFi] Preparing chunked transmission:", {
+      originalJsonLength: data.length,
+      withPrefixLength: fullData.length,
+      base64Length: base64Data.length,
+      lengthPrefix,
+    });
+
+    // Split base64 data into chunks
+    const chunks = this.chunkData(base64Data);
+
+    // Send chunks sequentially with delays
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const isLastChunk = i === chunks.length - 1;
+
+      console.log(`📤 [WiFi] Sending chunk ${i + 1}/${chunks.length}:`, {
+        chunkLength: chunk.length,
+        isLastChunk,
+        progress: Math.round(((i + 1) / chunks.length) * 100),
+      });
+
+      try {
+        // Send chunk (chunk is part of base64 string, send as-is)
+        await this.ssidCharacteristic.writeWithResponse(chunk);
+
+        // Add delay between chunks to prevent overrun (except for last chunk)
+        if (!isLastChunk) {
+          await new Promise((resolve) => setTimeout(resolve, CHUNK_DELAY_MS));
+        }
+      } catch (error) {
+        console.error(`💥 [WiFi] Failed to send chunk ${i + 1}:`, error);
+        throw new Error(`Failed to send data chunk ${i + 1}`);
+      }
+    }
+
+    console.log("✅ [WiFi] All chunks sent successfully!");
+  }
+
+  /**
+   * Send WiFi credentials to the connected device using chunked transmission
    */
   async sendWiFiCredentials(credentials: WiFiCredentials): Promise<void> {
     if (!this.device || !this.ssidCharacteristic) {
@@ -323,15 +459,16 @@ class WiFiProvisioningService {
       authTokenLength: credentials.auth_token.length,
       deviceId: this.device.id,
       characteristicUuid: this.ssidCharacteristic.uuid,
+      mtu: this.negotiatedMTU,
     });
 
     try {
-      // Prepare enhanced credentials JSON with auth token and device metadata
+      // Create enhanced credentials object
       const credentialsJson = JSON.stringify({
         ssid: credentials.ssid,
         password: credentials.password,
-        auth_token: credentials.auth_token,
         device_name: credentials.device_name,
+        auth_token: credentials.auth_token,
         user_timezone: credentials.user_timezone,
       });
 
@@ -343,19 +480,8 @@ class WiFiProvisioningService {
         includesTimezone: credentialsJson.includes("user_timezone"),
       });
 
-      // Convert to base64 for BLE transmission (React Native compatible)
-      const base64Data = btoa(credentialsJson);
-
-      console.log(
-        "📤 [WiFi] Sending enhanced credentials to SSID characteristic...",
-        {
-          dataLength: base64Data.length,
-          useResponse: this.ssidCharacteristic.isWritableWithResponse,
-        }
-      );
-
-      // Send credentials with write response
-      await this.ssidCharacteristic.writeWithResponse(base64Data);
+      // Send using chunked transmission
+      await this.sendChunkedData(credentialsJson);
 
       console.log("✅ [WiFi] Enhanced WiFi credentials sent successfully!");
 
