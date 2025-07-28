@@ -46,9 +46,8 @@ export const authService = {
     }
 
     return {
-      user_id: cognitoUser.userId,
+      userId: cognitoUser.userId, // Use Cognito Sub directly as userId
       email: cognitoUser.signInDetails?.loginId || "",
-      cognito_sub: cognitoUser.userId,
       email_verified: true, // Cognito handles email verification
       full_name: fullName,
     };

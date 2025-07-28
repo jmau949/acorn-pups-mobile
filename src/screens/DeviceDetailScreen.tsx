@@ -56,17 +56,17 @@ export const DeviceDetailScreen: React.FC = () => {
     isLoading,
     isError,
     error,
-  } = useUserDevices(user?.user_id || "");
+  } = useUserDevices(user?.userId || "");
 
   // Device mutations
-  const updateSettings = useUpdateDeviceSettings(user?.user_id || "");
-  const resetDevice = useResetDevice(user?.user_id || "");
+  const updateSettings = useUpdateDeviceSettings(user?.userId || "");
+  const resetDevice = useResetDevice(user?.userId || "");
 
   // Find the specific device
   const device = devicesData?.devices?.find((d) => d.deviceId === deviceId);
 
   // Check if user is device owner
-  const isOwner = device?.ownerId === user?.user_id;
+  const isOwner = device?.ownerId === user?.userId;
   const canManageSettings = device?.permissions?.settings || isOwner;
 
   const handleBackPress = () => {

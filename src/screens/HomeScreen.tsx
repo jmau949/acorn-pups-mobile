@@ -87,7 +87,7 @@ export const HomeScreen: React.FC = () => {
                 <XStack justifyContent="space-between" alignItems="center">
                   <Text color="$color10">User ID:</Text>
                   <Text fontWeight="500" fontSize="$3">
-                    {user?.user_id || "N/A"}
+                    {user?.userId || "N/A"}
                   </Text>
                 </XStack>
               </YStack>

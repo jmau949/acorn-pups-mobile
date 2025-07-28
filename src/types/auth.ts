@@ -2,9 +2,8 @@
  * Auth-specific User type (minimal info from Cognito)
  */
 export interface AuthUser {
-  user_id: string;
+  userId: string; // Cognito Sub UUID used directly as user identifier
   email: string;
-  cognito_sub: string;
   email_verified: boolean;
   full_name?: string;
 }

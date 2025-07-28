@@ -10,9 +10,8 @@
  */
 export interface User {
   // Primary identifiers
-  user_id: string; // Unique UUID for the user
+  userId: string; // Cognito Sub UUID used directly as user identifier
   email: string; // User email address (unique)
-  cognito_sub: string; // AWS Cognito user pool subject ID
 
   // Profile information
   full_name: string; // User full name

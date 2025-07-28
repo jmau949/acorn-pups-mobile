@@ -25,7 +25,7 @@ export const DevicesScreen: React.FC = () => {
     isFetching,
     refetch,
     isRefetching,
-  } = useUserDevices(user?.user_id || "");
+  } = useUserDevices(user?.userId || "");
 
   // Access unwrapped data directly
   const devices = devicesData?.devices || [];
@@ -62,7 +62,7 @@ export const DevicesScreen: React.FC = () => {
    * Uses device permissions from the new schema
    */
   const canManageDevice = (device: Device): boolean => {
-    return device.permissions?.settings || device.ownerId === user?.user_id;
+    return device.permissions?.settings || device.ownerId === user?.userId;
   };
 
   return (
@@ -187,7 +187,7 @@ export const DevicesScreen: React.FC = () => {
                         <Text fontSize="$6" fontWeight="600" color="$color12">
                           {getDeviceDisplayName(device)}
                         </Text>
-                        {device.ownerId === user?.user_id && (
+                        {device.ownerId === user?.userId && (
                           <Text fontSize="$2" color="$color10" fontWeight="500">
                             OWNER
                           </Text>
