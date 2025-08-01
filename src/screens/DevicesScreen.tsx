@@ -1,4 +1,5 @@
-import { deviceUtils, useUserDevices } from "@/hooks/useUserDevices";
+import { useDeviceStatusPolling } from "@/hooks/useDeviceStatusPolling";
+import { deviceUtils } from "@/hooks/useUserDevices";
 import { useAuthContext } from "@/providers/AuthProvider";
 import { Device } from "@/types/devices";
 import { AppStackParamList } from "@/types/navigation";
@@ -7,7 +8,17 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React from "react";
 import { ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button, Card, H1, H3, Spinner, Text, XStack, YStack } from "tamagui";
+import {
+  Button,
+  Card,
+  Circle,
+  H1,
+  H3,
+  Spinner,
+  Text,
+  XStack,
+  YStack,
+} from "tamagui";
 
 type DevicesScreenNavigationProp = NativeStackNavigationProp<AppStackParamList>;
 
@@ -16,16 +27,20 @@ export const DevicesScreen: React.FC = () => {
   const navigation = useNavigation<DevicesScreenNavigationProp>();
   const { user } = useAuthContext();
 
-  // Use the custom hook to fetch devices - now returns unwrapped data
+  // Use device status polling hook with automatic 60-second refresh
   const {
     data: devicesData,
     isLoading,
     isError,
     error,
     isFetching,
-    refetch,
     isRefetching,
-  } = useUserDevices(user?.userId || "");
+    isPolling,
+    refreshDeviceStatus,
+  } = useDeviceStatusPolling({
+    userId: user?.userId || "",
+    enabled: !!user?.userId,
+  });
 
   // Access unwrapped data directly
   const devices = devicesData?.devices || [];
@@ -43,7 +58,7 @@ export const DevicesScreen: React.FC = () => {
 
   const handleRefresh = async () => {
     try {
-      await refetch();
+      await refreshDeviceStatus();
     } catch (error) {
       console.error("Failed to refresh devices:", error);
     }
@@ -89,13 +104,30 @@ export const DevicesScreen: React.FC = () => {
             <H1 textAlign="center" color="$color12">
               My Devices
             </H1>
-            <Text color="$color10" textAlign="center">
-              {totalCount > 0
-                ? `${onlineCount} of ${totalCount} devices online`
-                : "Manage and monitor your connected devices"}
-            </Text>
+            <YStack space="$2" alignItems="center">
+              <Text color="$color10" textAlign="center">
+                {totalCount > 0
+                  ? `${onlineCount} of ${totalCount} devices online`
+                  : "Manage and monitor your connected devices"}
+              </Text>
 
-            {/* Refresh Button */}
+              {/* Polling Status Indicator */}
+              {totalCount > 0 && (
+                <XStack space="$2" alignItems="center">
+                  <Circle
+                    size={8}
+                    backgroundColor={isPolling ? "$green9" : "$gray8"}
+                  />
+                  <Text fontSize="$2" color="$color10">
+                    {isPolling
+                      ? "Auto-refreshing every 60s"
+                      : "Auto-refresh paused"}
+                  </Text>
+                </XStack>
+              )}
+            </YStack>
+
+            {/* Manual Refresh Button */}
             {!isLoading && (
               <Button
                 size="$3"
@@ -104,13 +136,13 @@ export const DevicesScreen: React.FC = () => {
                 disabled={isFetching}
                 opacity={isFetching ? 0.5 : 1}
               >
-                {isRefetching ? (
+                {isRefetching || isFetching ? (
                   <XStack space="$2" alignItems="center">
                     <Spinner size="small" />
                     <Text>Refreshing...</Text>
                   </XStack>
                 ) : (
-                  "Refresh"
+                  "Refresh Now"
                 )}
               </Button>
             )}
